@@ -1,0 +1,21 @@
+# Abhängigkeiten (werden nicht gebraucht – Build nutzt nur Node-Standardbibliothek)
+node_modules/
+
+# Laufzeit-Datenbank der Desktop-App
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+
+# Build-Zwischendateien / Test-Ausgaben
+app-mobile/test/out/
+
+# Lokale Claude-Einstellungen
+.claude/
+
+# System
+.DS_Store
+Thumbs.db

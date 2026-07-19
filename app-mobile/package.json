@@ -1,0 +1,10 @@
+{
+  "name": "dienstplaner-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile Personalplanung (eine HTML-Datei, keine Laufzeit-Abhaengigkeiten).",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/test_planner.mjs && node test/test_exports.mjs"
+  }
+}
