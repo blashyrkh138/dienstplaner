@@ -36,6 +36,11 @@ mkdirSync(join(here, "dist"), { recursive: true });
 writeFileSync(join(here, "dist", "dienstplaner-mobil.html"), html, "utf-8");
 console.log("OK -> dist/dienstplaner-mobil.html (" + Math.round(html.length / 1024) + " KB)");
 
+// GitHub-Pages-Reserve: dieselbe Web-App als index.html im /docs-Ordner (Repo-Wurzel)
+mkdirSync(join(here, "..", "docs"), { recursive: true });
+writeFileSync(join(here, "..", "docs", "index.html"), html, "utf-8");
+console.log("OK -> docs/index.html (GitHub Pages)");
+
 // Artifact-Variante: claude.ai liefert doctype/head/body selbst -> nur Seiteninhalt
 const artifact = `<title>Dienstplaner</title>
 <style>

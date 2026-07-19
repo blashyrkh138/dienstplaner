@@ -1,0 +1,2924 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111f30">
+<title>Dienstplaner</title>
+<style>
+/* Dienstplaner mobil - Navy/Gold "nautisches Instrument", mobile-first (412px).
+   Dunkel = Standard, hell per data-theme="light". Touch >=44px, Basis 16px. */
+
+:root {
+  --font: ui-sans-serif, system-ui, Roboto, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Roboto Mono", Consolas, monospace;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  --tap: 44px;
+  --px-h: 56px;               /* Pixel pro Stunde in der Tagesansicht */
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+:root, :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: oklch(0.16 0.03 245);
+  --surface: oklch(0.205 0.032 245);
+  --surface-2: oklch(0.25 0.034 245);
+  --surface-3: oklch(0.30 0.034 245);
+  --line: oklch(0.34 0.028 245);
+  --line-strong: oklch(0.45 0.03 245);
+  --ink: oklch(0.96 0.01 240);
+  --ink-mut: oklch(0.76 0.022 240);
+  --ink-faint: oklch(0.60 0.02 240);
+  --accent: oklch(0.83 0.11 84);
+  --accent-strong: oklch(0.72 0.13 78);
+  --accent-ink: oklch(0.20 0.04 80);
+  --accent-soft: oklch(0.83 0.11 84 / .14);
+  --brass: oklch(0.66 0.09 82 / .55);
+  --danger: oklch(0.68 0.18 25); --warning: oklch(0.82 0.13 78);
+  --success: oklch(0.74 0.13 155); --info: oklch(0.74 0.09 235);
+  --danger-soft: oklch(0.68 0.18 25 / .15); --warning-soft: oklch(0.82 0.13 78 / .15);
+  --success-soft: oklch(0.74 0.13 155 / .15);
+  --shadow: 0 10px 30px -10px rgb(0 0 0 / .6);
+  --grid: oklch(0.34 0.028 245 / .55);
+  --today: oklch(0.83 0.11 84 / .06);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: oklch(0.975 0.006 240);
+  --surface: oklch(1 0 0); --surface-2: oklch(0.965 0.008 240); --surface-3: oklch(0.94 0.01 240);
+  --line: oklch(0.90 0.01 240); --line-strong: oklch(0.80 0.014 240);
+  --ink: oklch(0.24 0.03 245); --ink-mut: oklch(0.45 0.03 245); --ink-faint: oklch(0.58 0.025 245);
+  --accent: oklch(0.62 0.13 78); --accent-strong: oklch(0.54 0.14 72); --accent-ink: oklch(1 0 0);
+  --accent-soft: oklch(0.62 0.13 78 / .12); --brass: oklch(0.62 0.10 78 / .5);
+  --danger: oklch(0.55 0.20 27); --warning: oklch(0.60 0.14 68);
+  --success: oklch(0.55 0.13 155); --info: oklch(0.55 0.11 240);
+  --danger-soft: oklch(0.55 0.20 27 / .10); --warning-soft: oklch(0.70 0.15 70 / .14);
+  --success-soft: oklch(0.55 0.13 155 / .10);
+  --shadow: 0 12px 28px -12px rgb(20 30 50 / .25);
+  --grid: oklch(0.90 0.01 240); --today: oklch(0.62 0.13 78 / .06);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font); font-size: 16px; line-height: 1.45;
+  background: var(--bg); color: var(--ink);
+  -webkit-font-smoothing: antialiased; overflow: hidden;
+  overscroll-behavior: none;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: none; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------- Shell -------------------------------- */
+#app { height: 100dvh; display: flex; flex-direction: column; }
+.screen { flex: 1; min-height: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
+
+.hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: max(10px, env(safe-area-inset-top)) 12px 10px;
+  background: color-mix(in oklab, var(--surface) 70%, var(--bg));
+  border-bottom: 1px solid var(--line); flex: none;
+}
+.hdr__title { font-weight: 650; font-size: 17px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hdr__title span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hdr__spacer { flex: 1; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+/* Bottom-Tabs */
+.tabs {
+  display: grid; grid-template-columns: repeat(5, 1fr); flex: none;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabs button {
+  min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; color: var(--ink-faint); font-size: 11px; font-weight: 550;
+}
+.tabs button svg { width: 22px; height: 22px; }
+.tabs button.on { color: var(--accent); }
+.tabs button.on svg { filter: drop-shadow(0 0 6px var(--accent-soft)); }
+
+/* ------------------------------ Buttons ------------------------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 10px 16px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--line-strong);
+  font-weight: 600; font-size: 15.5px; white-space: nowrap;
+}
+.btn svg { width: 19px; height: 19px; }
+.btn:active { transform: translateY(1px); }
+.btn--pri {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  color: var(--accent-ink); border-color: var(--accent-strong);
+}
+.btn--ghost { background: transparent; border-color: transparent; color: var(--ink-mut); }
+.btn--icon { min-width: var(--tap); padding: 10px; }
+.btn--sm { min-height: 38px; padding: 7px 12px; font-size: 14px; }
+.btn--danger { color: var(--danger); border-color: color-mix(in oklab, var(--danger) 40%, var(--line)); }
+.btn--block { width: 100%; }
+.btn:disabled { opacity: .5; }
+
+/* ------------------------------ Plan ---------------------------------- */
+.weekstrip { display: flex; gap: 4px; padding: 8px 10px; overflow-x: auto; flex: none;
+  background: var(--surface); border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.weekstrip::-webkit-scrollbar { display: none; }
+.wchip {
+  flex: 1 0 48px; min-height: 52px; border-radius: var(--r-md);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--ink-mut); border: 1px solid transparent; position: relative;
+}
+.wchip small { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+.wchip b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.wchip.today b { color: var(--accent); }
+.wchip.on { background: var(--accent-soft); border-color: var(--brass); color: var(--ink); }
+.wchip .load { position: absolute; bottom: 4px; display: flex; gap: 2px; }
+.wchip .load i { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-faint); }
+.wchip.hol::after { content: "†"; position: absolute; top: 2px; right: 6px; color: var(--warning); font-size: 10px; }
+
+.planbar { display: flex; gap: 8px; padding: 8px 12px; align-items: center; flex: none;
+  border-bottom: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 45%, var(--bg)); }
+.planbar .kw { font-weight: 650; font-size: 15px; }
+.planbar .rng { font-size: 12px; color: var(--ink-mut); font-family: var(--mono); }
+
+.hours { display: flex; gap: 6px; padding: 8px 12px; overflow-x: auto; flex: none; scrollbar-width: none; }
+.hours::-webkit-scrollbar { display: none; }
+.hchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill);
+  background: var(--surface-2); border: 1px solid var(--line); font-size: 13px; white-space: nowrap; }
+.hchip i { width: 9px; height: 9px; border-radius: 50%; }
+.hchip .mono { color: var(--ink-mut); }
+
+/* Wochenraster: Hochformat = breite Spalten + horizontales Wischen (Snap),
+   breite Screens = alle 7 Spalten sichtbar. Zeitachse + Tageskoepfe sticky. */
+#calwrap { overscroll-behavior-x: contain; scroll-snap-type: x proximity; scroll-padding-left: 48px; }
+.cal { display: grid; min-height: 100%; width: max-content; }
+.cal--week { grid-template-columns: 48px repeat(7, 172px); }
+@media (min-width: 700px) {
+  .cal { width: auto; }
+  .cal--week { grid-template-columns: 46px repeat(7, minmax(96px, 1fr)); min-width: 700px; }
+}
+.cal .corner { position: sticky; top: 0; left: 0; z-index: 8; background: var(--surface);
+  border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.cal .axis { position: sticky; left: 0; z-index: 7; background: var(--bg); border-right: 1px solid var(--line); }
+.dhead, .dcol { scroll-snap-align: start; }
+.cal .tick { position: absolute; right: 6px; transform: translateY(-50%);
+  font-size: 11px; color: var(--ink-faint); font-family: var(--mono); }
+.cal .tick::after { content: ""; position: absolute; right: -6px; top: 50%; width: 4px; height: 1px; background: var(--brass); }
+.dcol {
+  position: relative; border-left: 1px solid var(--line);
+  background-image: repeating-linear-gradient(to bottom, var(--grid) 0 1px, transparent 1px var(--px-h));
+}
+.dcol.today { background-color: var(--today); }
+.dcol.closed { background-image:
+  repeating-linear-gradient(to bottom, var(--grid) 0 1px, transparent 1px var(--px-h)),
+  repeating-linear-gradient(-45deg, transparent 0 9px, color-mix(in oklab, var(--ink-faint) 8%, transparent) 9px 10px); }
+.dcol .edge { position: absolute; left: 0; right: 0; pointer-events: none;
+  background: repeating-linear-gradient(-45deg, transparent 0 8px, color-mix(in oklab, var(--ink-faint) 7%, transparent) 8px 9px); }
+.dhead { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  border-left: 1px solid var(--line); padding: 7px 10px; font-size: 14px; font-weight: 650; }
+.dhead.today { color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
+.dhead small { display: block; color: var(--warning); font-weight: 500; font-size: 11px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.allday { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 10px; flex: none;
+  border-bottom: 1px solid var(--line); background: color-mix(in oklab, var(--surface) 80%, var(--bg)); }
+.allday:empty { display: none; }
+.schip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);
+  font-size: 12.5px; font-weight: 550; border: 1px solid color-mix(in oklab, var(--c, var(--line)) 55%, var(--line));
+  background: color-mix(in oklab, var(--c, var(--surface-2)) 18%, var(--surface)); }
+.schip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--ink-faint)); }
+
+.shift {
+  position: absolute; left: 3px; right: 3px; border-radius: var(--r-sm);
+  padding: 4px 8px; overflow: hidden; color: #fff;
+  border: 1px solid rgb(0 0 0 / .2); box-shadow: 0 1px 3px rgb(0 0 0 / .35), inset 0 1px 0 rgb(255 255 255 / .16);
+  display: flex; flex-direction: column; gap: 1px; min-height: 22px;
+}
+.shift b { font-size: 14px; letter-spacing: .01em; }
+.shift .t { font-family: var(--mono); font-size: 12px; opacity: .92; }
+.shift .l { font-size: 12px; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shift.locked { box-shadow: 0 1px 3px rgb(0 0 0 / .35), inset 0 0 0 2px var(--accent); }
+.shift.home::after { content: "⌂"; position: absolute; top: 3px; right: 7px; font-size: 12px; opacity: .8; }
+.shift[data-kind="telefon"] { border-style: dashed; }
+@media (min-width: 700px) {
+  .cal--week .shift b { font-size: 12px; }
+  .cal--week .shift .t { font-size: 10px; }
+}
+.nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent); z-index: 4; pointer-events: none; }
+.nowline::before { content: ""; position: absolute; left: -1px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+/* ------------------------------ Listen-Screens ------------------------ */
+.page { padding: 14px 14px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 14px; }
+.page h1 { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+.page h2 { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.muted { color: var(--ink-mut); font-size: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.rowhead { display: flex; align-items: center; gap: 8px; }
+.rowhead .sp { flex: 1; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.item { display: flex; align-items: center; gap: 10px; min-height: var(--tap);
+  padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); text-align: left; width: 100%; }
+.item .bar { width: 6px; align-self: stretch; border-radius: 3px; flex: none; background: var(--c, var(--line-strong)); }
+.item .bd { flex: 1; min-width: 0; }
+.item .ti { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .mt { font-size: 12.5px; color: var(--ink-mut); font-family: var(--mono); }
+.item .tag { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: var(--r-pill); flex: none;
+  border: 1px solid color-mix(in oklab, var(--c, var(--line)) 50%, var(--line));
+  color: var(--c, var(--ink-mut)); background: color-mix(in oklab, var(--c, transparent) 12%, transparent); }
+.empty { border: 1px dashed var(--line-strong); border-radius: var(--r-md); padding: 12px; color: var(--ink-faint); font-size: 14px; }
+
+.warnitem { display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--line); }
+.warnitem i { width: 9px; height: 9px; border-radius: 50%; background: var(--warning); margin-top: 6px; flex: none; }
+.warnitem[data-sev="high"] i { background: var(--danger); }
+.warnitem .d { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+
+/* ------------------------------ Sheets (Editoren) --------------------- */
+dialog.sheet { border: none; padding: 0; background: transparent; width: 100%; max-width: 560px;
+  margin: auto auto 0; max-height: 92dvh; }
+dialog.sheet::backdrop { background: rgb(0 0 0 / .5); }
+.sheet__box { background: var(--surface); border: 1px solid var(--line-strong); border-bottom: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; max-height: 92dvh; }
+.sheet__grip { width: 40px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 10px auto 2px; flex: none; }
+.sheet__head { display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex: none; }
+.sheet__head .ti { font-size: 17px; font-weight: 650; flex: 1; }
+.sheet__body { overflow: auto; padding: 6px 16px 12px; display: flex; flex-direction: column; gap: 14px; }
+.sheet__foot { display: flex; gap: 10px; padding: 12px 16px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); flex: none; }
+.sheet__foot .sp { flex: 1; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-size: 13px; font-weight: 550; color: var(--ink-mut); }
+.frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ctl { width: 100%; min-height: var(--tap); padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--line-strong); font-size: 16px; }
+.ctl:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+select.ctl { appearance: none; }
+textarea.ctl { min-height: 90px; resize: vertical; font-family: var(--mono); font-size: 14px; }
+input[type="time"].ctl, input[type="date"].ctl { font-family: var(--mono); }
+input[type="color"].ctl { padding: 4px; height: var(--tap); }
+.check { display: flex; align-items: center; gap: 10px; min-height: var(--tap); font-size: 15.5px; }
+.check input { width: 22px; height: 22px; accent-color: var(--accent); }
+.seg { display: flex; background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: 3px; gap: 3px; }
+.seg button { flex: 1; min-height: 40px; border-radius: 9px; font-size: 14.5px; font-weight: 550; color: var(--ink-mut); }
+.seg button.on { background: var(--surface-3); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .3); }
+.wdgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.wdgrid .c { display: flex; flex-direction: column; gap: 3px; align-items: stretch; }
+.wdgrid small { text-align: center; font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; }
+.wdgrid select { min-height: 40px; padding: 4px 2px; text-align: center; font-size: 13px;
+  border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--line-strong); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 7px 13px;
+  border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--surface-2); font-size: 14.5px; }
+.chip input { width: 18px; height: 18px; accent-color: var(--accent); }
+.chip:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+
+/* Verfuegbarkeits-Vorschau */
+.avtable { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.avtable th, .avtable td { border: 1px solid var(--line); padding: 6px 4px; text-align: center; }
+.avtable th { background: var(--surface-2); font-size: 11px; color: var(--ink-mut); }
+.avtable td.nm { text-align: left; min-width: 130px; }
+.avcell { font-weight: 600; border-radius: 6px; padding: 2px 6px; font-size: 12px; }
+.av-yes { color: var(--success); background: var(--success-soft); }
+.av-no { color: var(--danger); background: var(--danger-soft); }
+.av-vm, .av-nm2 { color: var(--info); background: color-mix(in oklab, var(--info) 14%, transparent); }
+.avwarn { color: var(--warning); font-size: 12px; }
+.scrollx { overflow-x: auto; }
+
+/* Toast */
+.toasts { position: fixed; bottom: calc(70px + env(safe-area-inset-bottom)); left: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 8px; align-items: center; z-index: 60; pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 10px; max-width: 100%;
+  padding: 11px 16px; border-radius: var(--r-md); background: var(--surface-3);
+  border: 1px solid var(--line-strong); box-shadow: var(--shadow); font-size: 14.5px;
+  animation: tin .19s var(--ease); }
+.toast i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }
+.toast[data-k="success"] i { background: var(--success); }
+.toast[data-k="error"] i { background: var(--danger); }
+@keyframes tin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+  background: var(--warning-soft); color: var(--warning); border: 1px solid color-mix(in oklab, var(--warning) 45%, var(--line));
+  font-size: 12px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; }
+.badge.ok { background: var(--success-soft); color: var(--success); border-color: color-mix(in oklab, var(--success) 40%, var(--line)); }
+
+.fab-row { display: flex; gap: 8px; padding: 8px 12px; flex: none; border-top: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface) 60%, var(--bg)); }
+.fab-row .btn { flex: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+/* Deutsche gesetzliche Feiertage - offline berechnet.
+   Port von backend/holidays.py. Nur HINWEIS: Zentren koennen geoeffnet sein. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const BUNDESLAENDER = {
+    BW: "Baden-Wuerttemberg", BY: "Bayern", BE: "Berlin", BB: "Brandenburg",
+    HB: "Bremen", HH: "Hamburg", HE: "Hessen", MV: "Mecklenburg-Vorpommern",
+    NI: "Niedersachsen", NW: "Nordrhein-Westfalen", RP: "Rheinland-Pfalz",
+    SL: "Saarland", SN: "Sachsen", ST: "Sachsen-Anhalt", SH: "Schleswig-Holstein",
+    TH: "Thueringen",
+  };
+
+  function iso(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+
+  // Ostersonntag (anonymer gregorianischer Algorithmus)
+  function easterSunday(year) {
+    const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+    const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+
+  function bussUndBettag(year) {
+    let d = new Date(year, 10, 22); // 22. November
+    while (d.getDay() !== 3) d = addDays(d, -1); // Mittwoch davor
+    return d;
+  }
+
+  /** {"YYYY-MM-DD": "Name"} fuer Jahr + (optional) Bundesland. */
+  function holidaysFor(year, bundesland) {
+    const bl = (bundesland || "").toUpperCase();
+    const e = easterSunday(year);
+    const out = {};
+    const add = (d, name) => { out[iso(d)] = name; };
+
+    add(new Date(year, 0, 1), "Neujahr");
+    add(addDays(e, -2), "Karfreitag");
+    add(addDays(e, 1), "Ostermontag");
+    add(new Date(year, 4, 1), "Tag der Arbeit");
+    add(addDays(e, 39), "Christi Himmelfahrt");
+    add(addDays(e, 50), "Pfingstmontag");
+    add(new Date(year, 9, 3), "Tag der Deutschen Einheit");
+    add(new Date(year, 11, 25), "1. Weihnachtstag");
+    add(new Date(year, 11, 26), "2. Weihnachtstag");
+
+    if (["BW", "BY", "ST"].includes(bl)) add(new Date(year, 0, 6), "Heilige Drei Koenige");
+    if (["BE", "MV"].includes(bl)) add(new Date(year, 2, 8), "Internationaler Frauentag");
+    if (bl === "BB") { add(e, "Ostersonntag"); add(addDays(e, 49), "Pfingstsonntag"); }
+    if (["BW", "BY", "HE", "NW", "RP", "SL"].includes(bl)) add(addDays(e, 60), "Fronleichnam");
+    if (["SL", "BY"].includes(bl)) add(new Date(year, 7, 15), "Mariae Himmelfahrt");
+    if (bl === "TH") add(new Date(year, 8, 20), "Weltkindertag");
+    if (["BB", "HB", "HH", "MV", "NI", "SN", "ST", "SH", "TH"].includes(bl))
+      add(new Date(year, 9, 31), "Reformationstag");
+    if (["BW", "BY", "NW", "RP", "SL"].includes(bl)) add(new Date(year, 10, 1), "Allerheiligen");
+    if (bl === "SN") add(bussUndBettag(year), "Buss- und Bettag");
+
+    return out;
+  }
+
+  DP.holidays = { BUNDESLAENDER, easterSunday, holidaysFor };
+})();
+
+/* Datenmodell: ein JSON-Dokument statt SQLite.
+   Tabellen -> Arrays, Feldnamen identisch zu backend/db.py (Portierung 1:1).
+   JSON-Spalten (roles, availability, ...) sind hier native Objekte/Arrays. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const TABLES = [
+    "locations", "rooms", "operating_hours", "coverage_blocks", "employees",
+    "week_availability", "absences", "courses", "assignments", "patterns",
+    "templates", "special_days", "tasks",
+  ];
+
+  const MO = 0, DI = 1, MI = 2, DO = 3, FR = 4, SA = 5, SO = 6;
+
+  function emptyDoc() {
+    const doc = { schema: "dienstplaner-mobil-v1", settings: {}, nextId: {} };
+    TABLES.forEach((t) => { doc[t] = []; doc.nextId[t] = 1; });
+    return doc;
+  }
+
+  function insert(doc, table, row) {
+    const id = doc.nextId[table]++;
+    const rec = Object.assign({ id }, row);
+    doc[table].push(rec);
+    return rec;
+  }
+
+  function update(doc, table, id, patch) {
+    const rec = doc[table].find((r) => r.id === id);
+    if (rec) Object.assign(rec, patch);
+    return rec || null;
+  }
+
+  function remove(doc, table, id) {
+    const i = doc[table].findIndex((r) => r.id === id);
+    if (i >= 0) { doc[table].splice(i, 1); return true; }
+    return false;
+  }
+
+  const byId = (doc, table, id) => doc[table].find((r) => r.id === id) || null;
+  const where = (doc, table, pred) => doc[table].filter(pred);
+
+  /* ------------------------- Demo-Seed (aus seed.py) ------------------- */
+  function defaultSettings() {
+    return {
+      roles: ["Trainer", "Betreuung", "Technik", "Ausbilder", "Ersthelfer", "Schliessberechtigt"],
+      employment_types: ["Vollzeit", "Teilzeit", "Azubi", "Minijob"],
+      absence_types: [
+        { id: "urlaub", label: "Urlaub", color: "#C0392B", absent: true },
+        { id: "krank", label: "Krank", color: "#8E44AD", absent: true },
+        { id: "frei", label: "Frei", color: "#7F8C8D", absent: true },
+        { id: "schule", label: "Berufsschule", color: "#2980B9", absent: true },
+        { id: "wunsch_frei", label: "Wunsch-frei", color: "#16A085", absent: true },
+        { id: "sonstiges", label: "Sonstiges", color: "#95A5A6", absent: true },
+      ],
+      shift_kinds: [
+        { id: "dienst", label: "Dienst", color: "#3B6FB0", needs_room: false, home_ok: false, counts_hours: true },
+        { id: "kurs", label: "Kurs-Betreuung", color: "#7A5AA6", needs_room: false, home_ok: false, counts_hours: true },
+        { id: "telefon", label: "Telefondienst", color: "#4A9B8E", needs_room: false, home_ok: true, counts_hours: true },
+        { id: "zbv", label: "zbV / Sonderaufgabe", color: "#C99A2E", needs_room: true, home_ok: false, counts_hours: true },
+        { id: "event", label: "Termin", color: "#B5654B", needs_room: false, home_ok: false, counts_hours: false },
+        { id: "status", label: "Status", color: "#5A5F6A", needs_room: false, home_ok: false, counts_hours: false },
+      ],
+      course_types: [
+        { id: "praesenz", label: "Praesenz", color: "#2E7D5B", needs_room: true, needs_staff: false, default_staff: 0 },
+        { id: "hybrid", label: "Hybrid", color: "#C99A2E", needs_room: true, needs_staff: true, default_staff: 1 },
+        { id: "online", label: "Online", color: "#3E7CB1", needs_room: false, needs_staff: false, default_staff: 0 },
+      ],
+      planner: {
+        fairness_weight: 0.6, wish_weight: 0.4, prefer_contiguous: true, use_previous_week: true,
+        rules: {
+          location_binding: "enforce", school: "enforce", absence: "enforce",
+          rest_time: "warn", min_staff: "warn", max_hours_week: "warn",
+          max_hours_day: "warn", azubi_not_alone: "enforce", closer_present: "warn",
+        },
+        breaks: { threshold1_h: 6, break1_min: 30, threshold2_h: 9, break2_min: 45 },
+      },
+      view: { start_hour: 7, end_hour: 20, step_minutes: 30 },
+      title_format: "{kuerzel} {start} bis {end}",
+      mail_subject: "Verfügbarkeit",
+    };
+  }
+
+  function fullAvailability() {
+    const a = {};
+    for (let wd = 0; wd < 7; wd++) a[String(wd)] = "yes";
+    return a;
+  }
+
+  function seedDemo(doc) {
+    doc.settings = defaultSettings();
+
+    const locations = [
+      ["Bodensee (Konstanz)", "BOD", "#2F5D8A", "BW", 5, "08:00", "18:00", [MO, DI, MI, DO, FR]],
+      ["Ludwigsburg", "LB", "#4A9B8E", "BW", 5, "08:00", "17:00", [MO, DI, MI, DO, FR]],
+      ["Darmstadt", "DA", "#A1553D", "HE", 5, "08:00", "18:00", [MO, DI, MI, DO, FR]],
+    ];
+    const locIds = {};
+    locations.forEach(([name, kz, color, bl, nRooms, op, cl, days], sort) => {
+      const loc = insert(doc, "locations", {
+        name, kuerzel: kz, color, bundesland: bl, open_on_holidays: 1,
+        note: null, active: 1, sort,
+      });
+      locIds[kz] = loc.id;
+      for (let r = 1; r <= nRooms; r++)
+        insert(doc, "rooms", { location_id: loc.id, name: "Raum " + r, sort: r });
+      for (let wd = 0; wd < 7; wd++) {
+        const closed = !days.includes(wd);
+        insert(doc, "operating_hours", {
+          location_id: loc.id, weekday: wd,
+          open_time: closed ? null : op, close_time: closed ? null : cl, closed: closed ? 1 : 0,
+        });
+      }
+      days.forEach((wd) => {
+        insert(doc, "coverage_blocks", { location_id: loc.id, weekday: wd, start_time: op, end_time: "14:00", min_staff: 2, role_required: null, note: null });
+        insert(doc, "coverage_blocks", { location_id: loc.id, weekday: wd, start_time: "14:00", end_time: cl, min_staff: 1, role_required: null, note: null });
+      });
+    });
+
+    const employees = [
+      ["BOD", "Nadine Arendt", "NA", "#2E7D5B", "Vollzeit", 40, ["Trainer", "Schliessberechtigt"], 1, 1, 1, [], []],
+      ["BOD", "Ilka Sorel", "IS", "#3B6FB0", "Vollzeit", 40, ["Betreuung", "Schliessberechtigt"], 1, 1, 0, [], []],
+      ["BOD", "Tom Jansen", "TJ", "#5A5F6A", "Azubi", 35, ["Betreuung"], 0, 0, 1, [{ weekday: MI, period: "vm" }], []],
+      ["BOD", "Mia Moll", "MM", "#C99A2E", "Teilzeit", 25, ["Betreuung"], 0, 1, 0, [], [FR]],
+      ["LB", "Carla Kern", "CK", "#2E8B7F", "Vollzeit", 40, ["Trainer", "Technik", "Schliessberechtigt"], 1, 1, 1, [], []],
+      ["LB", "Hanna Abt", "HA", "#7A5AA6", "Teilzeit", 30, ["Betreuung"], 1, 1, 0, [], []],
+      ["DA", "Mara Jung", "MJ", "#B5654B", "Vollzeit", 40, ["Trainer", "Schliessberechtigt", "Ersthelfer"], 1, 1, 1, [], []],
+      ["DA", "Miriam Roth", "MR", "#4A6FA5", "Teilzeit", 28, ["Betreuung", "Technik"], 1, 1, 1, [], []],
+    ];
+    employees.forEach(([lk, name, kz, color, typ, wh, roles, kzu, kalone, homeoff, school, nogo], sort) => {
+      insert(doc, "employees", {
+        location_id: locIds[lk], name, kuerzel: kz, color,
+        employment_type: typ, weekly_hours: wh, max_hours_week: wh + 5, max_hours_day: 10,
+        earliest_start: null, latest_end: null, min_rest_hours: 11, max_consecutive_days: 6,
+        can_open_close: kzu, can_work_alone: kalone, can_home_office: homeoff,
+        roles, availability: fullAvailability(), school, nogo,
+        preferences: null, secondary_locations: null, vacation_days_total: null,
+        contract_start: null, contract_end: null, note: null, active: 1, sort,
+      });
+    });
+
+    return doc;
+  }
+
+  /* Migration bestehender Datenbestaende: jeder Standort hat mind. 5 Raeume. */
+  function migrate(doc) {
+    (doc.locations || []).forEach((l) => {
+      const n = doc.rooms.filter((r) => r.location_id === l.id).length;
+      for (let r = n + 1; r <= 5; r++)
+        insert(doc, "rooms", { location_id: l.id, name: "Raum " + r, sort: r });
+    });
+    return doc;
+  }
+
+  DP.model = { TABLES, emptyDoc, insert, update, remove, byId, where, seedDemo, defaultSettings, migrate };
+})();
+
+/* Auto-Planer - 1:1-Portierung von backend/planner.py.
+   Arbeitet auf dem JSON-Dokument (DP.model) statt SQLite.
+   Wochentag-Konvention: 0=Mo .. 6=So. Zeiten als "HH:MM". */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const DAY_SPLIT = 14 * 60;
+
+  /* ------------------------------ Zeit-Helfer ------------------------- */
+  const toMin = (hhmm) => {
+    if (!hhmm) return null;
+    const [h, m] = hhmm.split(":");
+    return +h * 60 + +m;
+  };
+  const toHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  const overlaps = (aS, aE, bS, bE) => aS < bE && bS < aE;
+  const isFree = (intervals, s, e) => intervals.every(([bs, be]) => !overlaps(s, e, bs, be));
+
+  /* ISO-Wochen-Helfer (Datum <-> KW) */
+  function isoWeekOf(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+    const week = 1 + Math.round(((d - firstThu) / 864e5 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+    return { year: d.getUTCFullYear(), week };
+  }
+  /** Datum (lokal) des Wochentags `dow` (1=Mo..7=So) der ISO-Woche year/week. */
+  function dateFromISOWeek(year, week, dow) {
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const mon1 = new Date(jan4);
+    mon1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+    const d = new Date(mon1);
+    d.setUTCDate(mon1.getUTCDate() + (week - 1) * 7 + (dow - 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
+  const weekdayOfISO = (isoDate) => {
+    const [y, m, d] = isoDate.split("-").map(Number);
+    return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // 0=Mo
+  };
+  const prevDateISO = (isoDate) => {
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    dt.setUTCDate(dt.getUTCDate() - 1);
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+  };
+
+  /* ------------------------------ Kontext ----------------------------- */
+  function loadContext(doc, locationId, year, week) {
+    const loc = DP.model.byId(doc, "locations", locationId);
+    const emps = doc.employees
+      .filter((e) => e.location_id === locationId && e.active)
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id);
+    const empIds = new Set(emps.map((e) => e.id));
+
+    const op = {};
+    doc.operating_hours.filter((r) => r.location_id === locationId).forEach((r) => { op[r.weekday] = r; });
+
+    const cov = {};
+    doc.coverage_blocks.filter((r) => r.location_id === locationId).forEach((r) => {
+      (cov[r.weekday] = cov[r.weekday] || []).push(r);
+    });
+
+    const inWeek = (r) => r.location_id === locationId && r.iso_year === year && r.iso_week === week;
+    const courses = doc.courses.filter(inWeek);
+    const tasks = doc.tasks.filter(inWeek);
+
+    const special = {};
+    doc.special_days.filter((r) => r.location_id === locationId).forEach((r) => { special[r.date] = r; });
+
+    const absences = {};
+    emps.forEach((e) => { absences[e.id] = []; });
+    doc.absences.forEach((a) => {
+      if (a.iso_year === year && a.iso_week === week && empIds.has(a.employee_id))
+        absences[a.employee_id].push(a);
+    });
+
+    const wa = {};
+    doc.week_availability.forEach((r) => {
+      if (r.iso_year === year && r.iso_week === week && empIds.has(r.employee_id))
+        wa[r.employee_id + ":" + r.weekday] = r.mode;
+    });
+
+    const locked = doc.assignments.filter((a) => inWeek(a) && a.locked);
+
+    return { loc, employees: emps, op, cov, courses, tasks, special, absences, wa, locked, settings: doc.settings };
+  }
+
+  /* --------------------------- Verfuegbarkeit ------------------------- */
+  function dayOpenClose(ctx, weekday, dateISO) {
+    const sp = ctx.special[dateISO];
+    if (sp) {
+      if (sp.closed) return null;
+      if (sp.open_time && sp.close_time) return [toMin(sp.open_time), toMin(sp.close_time)];
+    }
+    const row = ctx.op[weekday];
+    if (!row || row.closed || !row.open_time) return null;
+    return [toMin(row.open_time), toMin(row.close_time)];
+  }
+
+  function absenceHits(a, dateISO) {
+    if (!a.date) return true;
+    if (a.end_date) return a.date <= dateISO && dateISO <= a.end_date;
+    return a.date === dateISO;
+  }
+
+  /** Onsite-Fenster [start,end] oder null; soft=true bei Wunsch-frei. */
+  function onsiteWindow(emp, weekday, dateISO, dopen, dclose, ctx) {
+    let start = dopen, end = dclose, soft = false;
+
+    let mode = (emp.availability || {})[String(weekday)] || "yes";
+    const ov = ctx.wa[emp.id + ":" + weekday];
+    if (ov) mode = ov;
+    if (mode === "no" || mode === "home") return { window: null, soft: false };
+    if (mode === "vm") end = Math.min(end, DAY_SPLIT);
+    else if (mode === "nm") start = Math.max(start, DAY_SPLIT);
+
+    if ((emp.nogo || []).includes(weekday)) return { window: null, soft: false };
+
+    for (const s of emp.school || []) {
+      if (s.weekday === weekday) {
+        const p = s.period || "ganztags";
+        if (p === "ganztags") return { window: null, soft: false };
+        if (p === "vm") start = Math.max(start, DAY_SPLIT);
+        else if (p === "nm") end = Math.min(end, DAY_SPLIT);
+      }
+    }
+
+    for (const a of ctx.absences[emp.id] || []) {
+      if (!absenceHits(a, dateISO)) continue;
+      if (a.priority === "wunsch") { soft = true; continue; }
+      const p = a.period || "ganztags";
+      if (p === "ganztags") return { window: null, soft: false };
+      if (p === "vm") start = Math.max(start, DAY_SPLIT);
+      else if (p === "nm") end = Math.min(end, DAY_SPLIT);
+      else if (p === "custom" && a.start_time && a.end_time) {
+        const as = toMin(a.start_time), ae = toMin(a.end_time);
+        if (as <= start && ae >= end) return { window: null, soft: false };
+        if (as <= start && start < ae) start = ae;
+        if (as < end && end <= ae) end = as;
+      }
+    }
+
+    if (emp.earliest_start) start = Math.max(start, toMin(emp.earliest_start));
+    if (emp.latest_end) end = Math.min(end, toMin(emp.latest_end));
+
+    if (start >= end) return { window: null, soft: false };
+    return { window: [start, end], soft };
+  }
+
+  /* ------------------------------ Planer ------------------------------ */
+  function generate(doc, locationId, year, week, mode = "replan") {
+    const ctx = loadContext(doc, locationId, year, week);
+    const settings = ctx.settings || {};
+    const plannerCfg = settings.planner || {};
+    const rules = plannerCfg.rules || {};
+
+    const emps = ctx.employees;
+    const byIdMap = {};
+    emps.forEach((e) => { byIdMap[e.id] = e; });
+
+    const busy = {};                 // "empId:date" -> [[s,e],...]
+    const minutes = {};              // empId -> geleistete Minuten
+    const dayLastEnd = {};           // "empId:date" -> spaetestes Ende
+    const warnings = [];
+    const created = [];
+    emps.forEach((e) => { minutes[e.id] = 0; });
+
+    for (const a of ctx.locked) {
+      const key = a.employee_id + ":" + a.date;
+      (busy[key] = busy[key] || []).push([toMin(a.start_time), toMin(a.end_time)]);
+      minutes[a.employee_id] = (minutes[a.employee_id] || 0) + (toMin(a.end_time) - toMin(a.start_time));
+    }
+
+    const dates = [];
+    for (let d = 1; d <= 7; d++) dates.push(dateFromISOWeek(year, week, d));
+
+    const fairnessKey = (emp) => {
+      const soll = (emp.weekly_hours || 40) * 60;
+      const ratio = soll ? (minutes[emp.id] || 0) / soll : 1.0;
+      return [ratio, -(emp.can_open_close ? 1 : 0), emp.id];
+    };
+    const cmpFair = (a, b) => {
+      const ka = fairnessKey(a), kb = fairnessKey(b);
+      for (let i = 0; i < 3; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
+      return 0;
+    };
+
+    function assign(emp, dISO, start, end, kind, opts = {}) {
+      const key = emp.id + ":" + dISO;
+      (busy[key] = busy[key] || []).push([start, end]);
+      minutes[emp.id] = (minutes[emp.id] || 0) + (end - start);
+      dayLastEnd[key] = Math.max(dayLastEnd[key] || 0, end);
+      created.push({
+        location_id: locationId, iso_year: year, iso_week: week,
+        employee_id: emp.id, date: dISO,
+        start_time: toHHMM(start), end_time: toHHMM(end),
+        kind, work_mode: opts.work_mode || "onsite",
+        room_id: opts.room_id || null, course_id: opts.course_id || null,
+        task_text: opts.task_text || null, status_type: null,
+        locked: 0, auto_generated: 1,
+      });
+    }
+
+    function eligible(emp, dISO, weekday, start, end, needRole) {
+      const { window, soft } = onsiteWindow(emp, weekday, dISO, start, end, ctx);
+      if (!window) return { ok: false, soft: false };
+      const [ws, we] = window;
+      if (start < ws || end > we) return { ok: false, soft: false };
+      const key = emp.id + ":" + dISO;
+      if (!isFree(busy[key] || [], start, end)) return { ok: false, soft: false };
+
+      const alreadyToday = (busy[key] || []).reduce((s, [a, b]) => s + (b - a), 0);
+      const maxday = (emp.max_hours_day || 10) * 60;
+      if (alreadyToday + (end - start) > maxday && (rules.max_hours_day || "warn") === "enforce")
+        return { ok: false, soft: false };
+
+      const maxweek = (emp.max_hours_week || (emp.weekly_hours || 40) + 5) * 60;
+      if ((minutes[emp.id] || 0) + (end - start) > maxweek && (rules.max_hours_week || "warn") === "enforce")
+        return { ok: false, soft: false };
+
+      const restH = emp.min_rest_hours || 11;
+      const prev = dayLastEnd[emp.id + ":" + prevDateISO(dISO)];
+      if (prev !== undefined) {
+        const gapH = ((24 * 60 - prev) + start) / 60;
+        if (gapH < restH && (rules.rest_time || "warn") === "enforce")
+          return { ok: false, soft: false };
+      }
+
+      if (needRole && !(emp.roles || []).includes(needRole)) return { ok: true, soft: true };
+      return { ok: true, soft };
+    }
+
+    /* ---- 1) feste Bedarfe: Kurse mit Personal, dann Aufgaben ----------
+       Mehrtaegige Kurse (end_date) erzeugen Bedarf an JEDEM Tag im Zeitraum
+       (gleiche Uhrzeiten), begrenzt auf die Tage dieser Woche. */
+    const weekSet = new Set(dates);
+    const demands = [];
+    for (const c of ctx.courses) {
+      if ((c.staff_needed || 0) > 0) {
+        const courseDays = [];
+        if (c.end_date && c.end_date > c.date) {
+          for (const d of dates) if (d >= c.date && d <= c.end_date) courseDays.push(d);
+        } else if (weekSet.has(c.date)) courseDays.push(c.date);
+        for (const d of courseDays)
+          demands.push({
+            date: d, start: toMin(c.start_time), end: toMin(c.end_time),
+            count: c.staff_needed, role: c.role_required || null,
+            kind: "kurs", room_id: c.room_id || null, course_id: c.id,
+            label: c.title || "Kurs",
+          });
+      }
+    }
+    for (const t of ctx.tasks) {
+      demands.push({
+        date: t.date, start: toMin(t.start_time), end: toMin(t.end_time),
+        count: t.staff_needed || 1, role: t.role_required || null,
+        kind: "zbv", room_id: t.room_id || null, task_text: t.title || null,
+        label: t.title || "Aufgabe",
+      });
+    }
+
+    for (const dm of demands) {
+      if (dm.start == null || dm.end == null) continue;
+      const weekday = weekdayOfISO(dm.date);
+      let picked = 0;
+      let cands = [...emps].sort(cmpFair);
+      cands = [
+        ...cands.filter((e) => !dm.role || (e.roles || []).includes(dm.role)),
+        ...cands.filter((e) => dm.role && !(e.roles || []).includes(dm.role)),
+      ];
+      for (const emp of cands) {
+        if (picked >= dm.count) break;
+        const { ok } = eligible(emp, dm.date, weekday, dm.start, dm.end, dm.role);
+        if (ok) {
+          assign(emp, dm.date, dm.start, dm.end, dm.kind, {
+            room_id: dm.room_id, course_id: dm.course_id, task_text: dm.task_text,
+          });
+          picked++;
+        }
+      }
+      if (picked < dm.count)
+        warnings.push({
+          type: "bedarf", date: dm.date, severity: "warn",
+          message: `${dm.label} (${toHHMM(dm.start)}-${toHHMM(dm.end)}): ${dm.count - picked} Person(en) fehlen`,
+        });
+    }
+
+    /* ---- 2) Grundbesetzung fair auffuellen ---------------------------- */
+    const step = ((settings.view || {}).step_minutes | 0) || 30;
+    for (const dISO of dates) {
+      const weekday = weekdayOfISO(dISO);
+      const oc = dayOpenClose(ctx, weekday, dISO);
+      if (!oc) continue;
+      const [dopen, dclose] = oc;
+      const blocks = ctx.cov[weekday] || [];
+      if (!blocks.length) continue;
+
+      const steps = [];
+      for (let s = dopen; s < dclose; s += step) steps.push(s);
+      const need = steps.map((s) => Math.max(0, ...blocks
+        .filter((b) => toMin(b.start_time) <= s && s < toMin(b.end_time))
+        .map((b) => b.min_staff)));
+      const covered = steps.map(() => 0);
+
+      for (const emp of emps) {
+        for (const [bs, be] of busy[emp.id + ":" + dISO] || []) {
+          steps.forEach((s, i) => { if (bs <= s && s < be) covered[i]++; });
+        }
+      }
+
+      let guard = 0;
+      while (steps.some((_, i) => need[i] > covered[i]) && guard < 200) {
+        guard++;
+        const gapI = steps.findIndex((_, i) => need[i] > covered[i]);
+        const gapStart = steps[gapI];
+
+        let best = null;
+        let cands = [...emps].sort(cmpFair);
+        if (covered[gapI] === 0) {
+          cands = [
+            ...cands.filter((e) => e.can_work_alone),
+            ...cands.filter((e) => !e.can_work_alone),
+          ];
+        }
+        for (const emp of cands) {
+          const { ok, soft } = eligible(emp, dISO, weekday, gapStart, gapStart + step, null);
+          if (ok) { best = { emp, soft }; if (!soft) break; }
+        }
+        if (!best) {
+          let last = gapI;
+          while (last < steps.length && need[last] > covered[last]) last++;
+          warnings.push({
+            type: "unterbesetzung", date: dISO, severity: "high",
+            message: `Unterbesetzung ${toHHMM(gapStart)}-${toHHMM(steps[last - 1] + step)}`,
+          });
+          for (let i = gapI; i < last; i++) covered[i] = need[i];
+          continue;
+        }
+
+        const emp = best.emp;
+        const { window } = onsiteWindow(emp, weekday, dISO, dopen, dclose, ctx);
+        const [ws, we] = window;
+        const maxday = (emp.max_hours_day || 10) * 60;
+        const key = emp.id + ":" + dISO;
+        const already = (busy[key] || []).reduce((s, [a, b]) => s + (b - a), 0);
+        const shiftStart = Math.max(gapStart, ws);
+        let shiftEnd = shiftStart;
+        let j = gapI;
+        while (
+          j < steps.length && need[j] > covered[j] && steps[j] + step <= we &&
+          (steps[j] + step - shiftStart) + already <= maxday &&
+          isFree(busy[key] || [], shiftStart, steps[j] + step)
+        ) {
+          shiftEnd = steps[j] + step;
+          j++;
+        }
+        if (shiftEnd <= shiftStart) shiftEnd = Math.min(shiftStart + step, we);
+        assign(emp, dISO, shiftStart, shiftEnd, "dienst");
+        steps.forEach((s, i) => { if (shiftStart <= s && s < shiftEnd) covered[i]++; });
+      }
+
+      checkDayWarnings(dISO, steps, step, busy, byIdMap, dclose, rules, warnings);
+    }
+
+    /* ---- 3) ins Dokument schreiben (nur nicht-fixierte ersetzen) ------ */
+    if (mode === "replan") {
+      doc.assignments = doc.assignments.filter(
+        (a) => !(a.location_id === locationId && a.iso_year === year && a.iso_week === week && !a.locked)
+      );
+      for (const rec of created) DP.model.insert(doc, "assignments", rec);
+    }
+
+    const hours = {};
+    let total = 0;
+    for (const [idStr, m] of Object.entries(minutes)) {
+      const e = byIdMap[+idStr];
+      if (e) hours[e.kuerzel] = Math.round((m / 60) * 10) / 10;
+      total += m;
+    }
+    warnings.sort((a, b) => (a.date + a.type).localeCompare(b.date + b.type));
+    return {
+      location_id: locationId, year, week,
+      created: created.length, warnings, hours,
+      total_hours: Math.round((total / 60) * 10) / 10,
+    };
+  }
+
+  function ranges(sortedSteps, step) {
+    const out = [];
+    for (const s of sortedSteps) {
+      if (out.length && out[out.length - 1][1] === s) out[out.length - 1][1] = s + step;
+      else out.push([s, s + step]);
+    }
+    return out;
+  }
+
+  function checkDayWarnings(dISO, steps, step, busy, byIdMap, dclose, rules, warnings) {
+    const presentAt = (s) => {
+      const ids = [];
+      for (const [key, ivs] of Object.entries(busy)) {
+        const sep = key.indexOf(":");
+        if (key.slice(sep + 1) !== dISO) continue;
+        const empId = +key.slice(0, sep);
+        for (const [bs, be] of ivs) if (bs <= s && s < be) { ids.push(empId); break; }
+      }
+      return [...new Set(ids)];
+    };
+
+    const azubiAlone = [];
+    for (const s of steps) {
+      const present = presentAt(s);
+      if (!present.length) continue;
+      if (!present.some((p) => (byIdMap[p] || {}).can_work_alone)) azubiAlone.push(s);
+    }
+    if ((rules.azubi_not_alone || "enforce") !== "off") {
+      for (const [rs, re] of ranges(azubiAlone, step))
+        warnings.push({
+          type: "azubi_allein", date: dISO, severity: "warn",
+          message: `${toHHMM(rs)}-${toHHMM(re)}: Azubi ohne erlaubte Begleitung`,
+        });
+    }
+
+    const last = dclose - step;
+    const presentEnd = presentAt(last);
+    if (presentEnd.length && (rules.closer_present || "warn") !== "off") {
+      if (!presentEnd.some((p) => (byIdMap[p] || {}).can_open_close))
+        warnings.push({
+          type: "kein_schliesser", date: dISO, severity: "warn",
+          message: `ab ${toHHMM(last)}: niemand mit Schliessberechtigung`,
+        });
+    }
+  }
+
+  DP.planner = { generate, loadContext, toMin, toHHMM, isoWeekOf, dateFromISOWeek, weekdayOfISO };
+})();
+
+/* ICS-Export (Google Kalender) - Port von backend/export_ics.py.
+   Mobil-tauglich ohne ZIP: combined-Datei oder je Mitarbeiter eine Datei. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const VTIMEZONE = [
+    "BEGIN:VTIMEZONE", "TZID:Europe/Berlin",
+    "BEGIN:DAYLIGHT", "TZOFFSETFROM:+0100", "TZOFFSETTO:+0200", "TZNAME:CEST",
+    "DTSTART:19700329T020000", "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU", "END:DAYLIGHT",
+    "BEGIN:STANDARD", "TZOFFSETFROM:+0200", "TZOFFSETTO:+0100", "TZNAME:CET",
+    "DTSTART:19701025T030000", "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU", "END:STANDARD",
+    "END:VTIMEZONE",
+  ];
+
+  const KIND_LABEL = { dienst: "Dienst", kurs: "Kurs", telefon: "Telefondienst", zbv: "Sonderaufgabe", event: "Termin" };
+
+  const esc = (s) => String(s == null ? "" : s)
+    .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  const dt = (dateISO, hhmm) => dateISO.replace(/-/g, "") + "T" + hhmm.replace(":", "") + "00";
+  const nextDay = (dateISO) => {
+    const [y, m, d] = dateISO.split("-").map(Number);
+    const x = new Date(Date.UTC(y, m - 1, d));
+    x.setUTCDate(x.getUTCDate() + 1);
+    return `${x.getUTCFullYear()}-${String(x.getUTCMonth() + 1).padStart(2, "0")}-${String(x.getUTCDate()).padStart(2, "0")}`;
+  };
+  const stamp = () => {
+    const n = new Date();
+    const p = (x) => String(x).padStart(2, "0");
+    return `${n.getFullYear()}${p(n.getMonth() + 1)}${p(n.getDate())}T${p(n.getHours())}${p(n.getMinutes())}${p(n.getSeconds())}`;
+  };
+
+  function gather(doc, locationId, year, week) {
+    const loc = DP.model.byId(doc, "locations", locationId);
+    const emps = doc.employees.filter((e) => e.location_id === locationId);
+    const rooms = {};
+    doc.rooms.filter((r) => r.location_id === locationId).forEach((r) => { rooms[r.id] = r.name; });
+    const inWeek = (r) => r.location_id === locationId && r.iso_year === year && r.iso_week === week;
+    const assigns = doc.assignments.filter(inWeek)
+      .sort((a, b) => (a.date + a.start_time).localeCompare(b.date + b.start_time));
+    const courses = {};
+    doc.courses.filter(inWeek).forEach((c) => { courses[c.id] = c; });
+    const empIds = new Set(emps.map((e) => e.id));
+    const absences = doc.absences.filter(
+      (a) => a.iso_year === year && a.iso_week === week && empIds.has(a.employee_id));
+    const dates = [];
+    for (let d = 1; d <= 7; d++) dates.push(DP.planner.dateFromISOWeek(year, week, d));
+    const absCat = {};
+    (doc.settings.absence_types || []).forEach((t) => { absCat[t.id] = t; });
+    return { loc, emps, rooms, assigns, courses, absences, dates, settings: doc.settings, absCat };
+  }
+
+  function summary(a, emp, courses, titleFormat) {
+    const base = titleFormat
+      .replace("{kuerzel}", emp.kuerzel || emp.name)
+      .replace("{start}", a.start_time).replace("{end}", a.end_time)
+      .replace("{name}", emp.name);
+    let detail = "";
+    if (a.kind === "kurs") {
+      const c = courses[a.course_id];
+      detail = "Kurs: " + (c && c.title ? c.title : "Kurs");
+    } else if (a.kind === "zbv") detail = a.task_text || "Sonderaufgabe";
+    else if (a.kind === "telefon") detail = "Telefondienst" + (a.work_mode === "home" ? " (Zuhause)" : "");
+    else if (a.kind !== "dienst") detail = KIND_LABEL[a.kind] || a.kind;
+    return detail ? `${base} · ${detail}` : base;
+  }
+
+  function employeeEvents(empId, g) {
+    const emp = g.emps.find((e) => e.id === empId);
+    const titleFormat = g.settings.title_format || "{kuerzel} {start} bis {end}";
+    const ts = stamp();
+    const lines = [];
+
+    for (const a of g.assigns) {
+      if (a.employee_id !== empId) continue;
+      const room = g.rooms[a.room_id];
+      const locTxt = g.loc.name + (room ? " · " + room : "");
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:dp-a${a.id}@dienstplaner`,
+        `DTSTAMP:${ts}`,
+        `DTSTART;TZID=Europe/Berlin:${dt(a.date, a.start_time)}`,
+        `DTEND;TZID=Europe/Berlin:${dt(a.date, a.end_time)}`,
+        "SUMMARY:" + esc(summary(a, emp, g.courses, titleFormat)),
+        "LOCATION:" + esc(locTxt),
+        "END:VEVENT",
+      );
+    }
+
+    for (const ab of g.absences) {
+      if (ab.employee_id !== empId) continue;
+      const t = g.absCat[ab.type] || { label: ab.type };
+      const start = ab.date || g.dates[0];
+      const endIncl = ab.end_date || (ab.date ? ab.date : g.dates[6]);
+      const end = nextDay(endIncl);
+      const per = ab.period;
+      const suffix = per && per !== "ganztags" ? ` (${per})` : "";
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:dp-ab${ab.id}@dienstplaner`,
+        `DTSTAMP:${ts}`,
+        `DTSTART;VALUE=DATE:${start.replace(/-/g, "")}`,
+        `DTEND;VALUE=DATE:${end.replace(/-/g, "")}`,
+        "SUMMARY:" + esc(`${emp.kuerzel} ${t.label}${suffix}`),
+        "TRANSP:TRANSPARENT",
+        "END:VEVENT",
+      );
+    }
+    return lines;
+  }
+
+  function wrapCalendar(name, eventLines) {
+    const head = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Dienstplaner//DE//v1",
+      "CALSCALE:GREGORIAN", "X-WR-CALNAME:" + esc(name), "X-WR-TIMEZONE:Europe/Berlin",
+      ...VTIMEZONE,
+    ];
+    return head.concat(eventLines, ["END:VCALENDAR"]).join("\r\n") + "\r\n";
+  }
+
+  /** combined: {filename, content}. */
+  function exportCombined(doc, locationId, year, week) {
+    const g = gather(doc, locationId, year, week);
+    const events = [];
+    for (const e of g.emps) events.push(...employeeEvents(e.id, g));
+    const kw = "KW" + week;
+    return {
+      filename: `Dienstplan_${g.loc.kuerzel || g.loc.name}_${kw}.ics`,
+      content: wrapCalendar(`Dienstplan ${g.loc.name} ${kw}`, events),
+    };
+  }
+
+  /** perPerson: Array von {employee_id, kuerzel, name, filename, content} (nur mit Terminen). */
+  function exportPerPerson(doc, locationId, year, week) {
+    const g = gather(doc, locationId, year, week);
+    const kw = "KW" + week;
+    const out = [];
+    for (const e of g.emps) {
+      const events = employeeEvents(e.id, g);
+      if (!events.length) continue;
+      out.push({
+        employee_id: e.id, kuerzel: e.kuerzel, name: e.name,
+        filename: `${e.kuerzel || e.id}_${kw}.ics`,
+        content: wrapCalendar(`${e.name} · ${kw}`, events),
+      });
+    }
+    return out;
+  }
+
+  DP.ics = { exportCombined, exportPerPerson };
+})();
+
+/* Minimaler XLSX-Schreiber (ersetzt ExcelJS, ~4 KB statt 844 KB).
+   Ein .xlsx ist ein ZIP mit Office-XML. Wir schreiben das ZIP unkomprimiert
+   (Methode "store") - das akzeptieren Excel, LibreOffice und openpyxl.
+
+   API:  DP.xlsx.build({ sheets: [ {name, cols, rows, merges, freeze} ] }) -> Uint8Array
+     cols   : [{w:26}, ...]
+     rows   : [{h:42, cells:[ {v, n?:true, s?:styleId} | null, ... ]}]
+     merges : ["A1:H1"]
+     freeze : {x:1, y:3}
+   Stile ueber DP.xlsx.styles(): .get({bold,size,color,fill,border,align}) -> styleId */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const enc = (s) => new TextEncoder().encode(s);
+  const xmlEsc = (s) => String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  /* ------------------------------- ZIP -------------------------------- */
+  const CRC = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    CRC[i] = c >>> 0;
+  }
+  function crc32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipStore(files) {
+    const parts = [], central = [];
+    let offset = 0;
+    for (const f of files) {
+      const nameB = enc(f.name), data = f.data, crc = crc32(data);
+      const lh = new Uint8Array(30 + nameB.length);
+      const dv = new DataView(lh.buffer);
+      dv.setUint32(0, 0x04034b50, true);
+      dv.setUint16(4, 20, true); dv.setUint16(6, 0, true); dv.setUint16(8, 0, true);
+      dv.setUint16(10, 0, true); dv.setUint16(12, 0x21, true);
+      dv.setUint32(14, crc, true);
+      dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+      dv.setUint16(26, nameB.length, true); dv.setUint16(28, 0, true);
+      lh.set(nameB, 30);
+      parts.push(lh, data);
+
+      const ch = new Uint8Array(46 + nameB.length);
+      const cv = new DataView(ch.buffer);
+      cv.setUint32(0, 0x02014b50, true);
+      cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+      cv.setUint16(8, 0, true); cv.setUint16(10, 0, true);
+      cv.setUint16(12, 0, true); cv.setUint16(14, 0x21, true);
+      cv.setUint32(16, crc, true);
+      cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+      cv.setUint16(28, nameB.length, true);
+      cv.setUint32(42, offset, true);
+      ch.set(nameB, 46);
+      central.push(ch);
+      offset += lh.length + data.length;
+    }
+    const cdSize = central.reduce((s, c) => s + c.length, 0);
+    const end = new Uint8Array(22);
+    const ev = new DataView(end.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
+    ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
+
+    const all = parts.concat(central, [end]);
+    const total = all.reduce((s, a) => s + a.length, 0);
+    const out = new Uint8Array(total);
+    let p = 0;
+    for (const a of all) { out.set(a, p); p += a.length; }
+    return out;
+  }
+
+  /* ------------------------------ Stile ------------------------------- */
+  const THIN = '<border><left style="thin"><color rgb="FFD6DBE2"/></left><right style="thin"><color rgb="FFD6DBE2"/></right><top style="thin"><color rgb="FFD6DBE2"/></top><bottom style="thin"><color rgb="FFD6DBE2"/></bottom><diagonal/></border>';
+
+  function styles() {
+    const fonts = ['<font><sz val="11"/><color rgb="FF1B2A41"/><name val="Calibri"/></font>'];
+    const fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'];
+    const borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>'];
+    const xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'];
+    const idx = (arr, xml) => { const i = arr.indexOf(xml); return i >= 0 ? i : arr.push(xml) - 1; };
+
+    function get(s) {
+      s = s || {};
+      const fi = idx(fonts, `<font><sz val="${s.size || 11}"/>${s.bold ? "<b/>" : ""}<color rgb="${s.color || "FF1B2A41"}"/><name val="Calibri"/></font>`);
+      const fl = s.fill ? idx(fills, `<fill><patternFill patternType="solid"><fgColor rgb="${s.fill}"/><bgColor indexed="64"/></patternFill></fill>`) : 0;
+      const bo = s.border ? idx(borders, THIN) : 0;
+      const a = s.align;
+      const al = a ? `<alignment${a.h ? ` horizontal="${a.h}"` : ""}${a.v ? ` vertical="${a.v}"` : ""}${a.wrap ? ' wrapText="1"' : ""}/>` : "";
+      const attrs = `numFmtId="0" fontId="${fi}" fillId="${fl}" borderId="${bo}" xfId="0" applyFont="1"${fl ? ' applyFill="1"' : ""}${bo ? ' applyBorder="1"' : ""}${al ? ' applyAlignment="1"' : ""}`;
+      return idx(xfs, al ? `<xf ${attrs}>${al}</xf>` : `<xf ${attrs}/>`);
+    }
+    function xml() {
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="${fonts.length}">${fonts.join("")}</fonts><fills count="${fills.length}">${fills.join("")}</fills><borders count="${borders.length}">${borders.join("")}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join("")}</cellXfs></styleSheet>`;
+    }
+    return { get, xml };
+  }
+
+  /* ------------------------------ Blätter ----------------------------- */
+  function colName(n) {
+    let s = "";
+    while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = (n - m - 1) / 26; }
+    return s;
+  }
+
+  function sheetXml(sh) {
+    let rows = "";
+    (sh.rows || []).forEach((row, ri) => {
+      const r = ri + 1;
+      let cells = "";
+      (row.cells || []).forEach((c, ci) => {
+        if (!c) return;
+        const ref = colName(ci + 1) + r;
+        const sAttr = c.s != null ? ` s="${c.s}"` : "";
+        if (c.v == null || c.v === "") { if (c.s != null) cells += `<c r="${ref}"${sAttr}/>`; return; }
+        if (c.n) cells += `<c r="${ref}"${sAttr}><v>${c.v}</v></c>`;
+        else cells += `<c r="${ref}"${sAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(c.v)}</t></is></c>`;
+      });
+      rows += `<row r="${r}"${row.h ? ` ht="${row.h}" customHeight="1"` : ""}>${cells}</row>`;
+    });
+    const cols = (sh.cols || []).length
+      ? `<cols>${sh.cols.map((c, i) => `<col min="${i + 1}" max="${i + 1}" width="${c.w}" customWidth="1"/>`).join("")}</cols>`
+      : "";
+    const fz = sh.freeze
+      ? `<pane xSplit="${sh.freeze.x}" ySplit="${sh.freeze.y}" topLeftCell="${colName(sh.freeze.x + 1)}${sh.freeze.y + 1}" activePane="bottomRight" state="frozen"/><selection pane="bottomRight"/>`
+      : "";
+    const merges = (sh.merges || []).length
+      ? `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${m}"/>`).join("")}</mergeCells>`
+      : "";
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView showGridLines="0" workbookViewId="0">${fz}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${rows}</sheetData>${merges}</worksheet>`;
+  }
+
+  function build({ sheets, stylesXml }) {
+    const files = [];
+    const sheetOverrides = sheets.map((_, i) =>
+      `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("");
+    files.push({
+      name: "[Content_Types].xml",
+      data: enc(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheetOverrides}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`),
+    });
+    files.push({
+      name: "_rels/.rels",
+      data: enc(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`),
+    });
+    files.push({
+      name: "xl/workbook.xml",
+      data: enc(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s, i) => `<sheet name="${xmlEsc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>`),
+    });
+    files.push({
+      name: "xl/_rels/workbook.xml.rels",
+      data: enc(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`),
+    });
+    files.push({ name: "xl/styles.xml", data: enc(stylesXml) });
+    sheets.forEach((sh, i) => files.push({ name: `xl/worksheets/sheet${i + 1}.xml`, data: enc(sheetXml(sh)) }));
+    return zipStore(files);
+  }
+
+  DP.xlsx = { build, styles, colName };
+})();
+
+/* Excel-Export - Blatt "Aushang" (farbiges Wochenraster) + "Abrechnung".
+   Nutzt den eigenen Mini-Schreiber DP.xlsx (kein ExcelJS mehr). */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const WD = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  const MONTHS = ["", "Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+    "August", "September", "Oktober", "November", "Dezember"];
+  const KIND_MARK = { kurs: "Kurs", telefon: "Tel", zbv: "zbV", event: "Termin" };
+  const NAVY = "FF1B2A41";
+
+  const toMin = (t) => { const [h, m] = t.split(":"); return +h * 60 + +m; };
+  const argb = (hex) => "FF" + (hex || "#888888").replace("#", "").toUpperCase();
+
+  function textColor(hex) {
+    const h = (hex || "#888888").replace("#", "");
+    const lin = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const v = (i) => lin(parseInt(h.slice(i, i + 2), 16) / 255);
+    const L = 0.2126 * v(0) + 0.7152 * v(2) + 0.0722 * v(4);
+    return L > 0.5 ? "FF12212F" : "FFF2F6FB";
+  }
+
+  function absOn(absences, empId, iso, absCat) {
+    const out = [];
+    for (const ab of absences) {
+      if (ab.employee_id !== empId) continue;
+      const hit = !ab.date || (ab.end_date && ab.date <= iso && iso <= ab.end_date) || ab.date === iso;
+      if (hit) {
+        const lbl = (absCat[ab.type] || {}).label || ab.type;
+        const per = ab.period;
+        out.push(lbl + (per && per !== "ganztags" ? ` (${per})` : ""));
+      }
+    }
+    return out;
+  }
+
+  /** Liefert {filename, buffer(Uint8Array)} */
+  async function exportExcel(doc, locationId, year, week) {
+    const loc = DP.model.byId(doc, "locations", locationId);
+    const emps = doc.employees
+      .filter((e) => e.location_id === locationId && e.active)
+      .sort((a, b) => (a.sort || 0) - (b.sort || 0) || a.id - b.id);
+    const inWeek = (r) => r.location_id === locationId && r.iso_year === year && r.iso_week === week;
+    const assigns = doc.assignments.filter(inWeek).sort((a, b) => a.start_time.localeCompare(b.start_time));
+    const empIds = new Set(emps.map((e) => e.id));
+    const absences = doc.absences.filter(
+      (a) => a.iso_year === year && a.iso_week === week && empIds.has(a.employee_id));
+    const absCat = {};
+    (doc.settings.absence_types || []).forEach((t) => { absCat[t.id] = t; });
+    const dates = [];
+    for (let d = 1; d <= 7; d++) dates.push(DP.planner.dateFromISOWeek(year, week, d));
+
+    const d0 = dates[0].split("-"), d6 = dates[6].split("-");
+    const rng = `${+d0[2]}.–${+d6[2]}. ${MONTHS[+d6[1]]} ${d6[0]}`;
+
+    const st = DP.xlsx.styles();
+    const sTitle = st.get({ bold: true, size: 14, color: NAVY });
+    const sHead = st.get({ bold: true, color: "FFF2F6FB", fill: NAVY, border: true, align: { h: "center" } });
+    const sHeadLeft = st.get({ bold: true, color: "FFF2F6FB", fill: NAVY, border: true });
+    const sCell = st.get({ border: true, align: { h: "center", v: "top", wrap: true } });
+    const sNum = st.get({ border: true, align: { h: "center" } });
+    const sNumBold = st.get({ bold: true, border: true, align: { h: "center" } });
+    const sName = st.get({ border: true });
+    const sPos = st.get({ color: "FF1E7B34", border: true, align: { h: "center" } });
+    const sNeg = st.get({ color: "FFB00020", border: true, align: { h: "center" } });
+
+    /* ---------------------------- Aushang ---------------------------- */
+    const aushang = { name: "Aushang", freeze: { x: 1, y: 3 }, merges: ["A1:H1"], rows: [], cols: [{ w: 26 }] };
+    for (let c = 0; c < 7; c++) aushang.cols.push({ w: 15 });
+
+    aushang.rows.push({ h: 24, cells: [{ v: `Dienstplan · ${loc.name} · KW ${week} · ${rng}`, s: sTitle }] });
+    aushang.rows.push({ cells: [] });
+    aushang.rows.push({
+      cells: [{ v: "Mitarbeiter", s: sHeadLeft }].concat(dates.map((iso, i) => {
+        const [, m, d] = iso.split("-").map(Number);
+        return { v: `${WD[i].slice(0, 2)} ${d}.${m}.`, s: sHead };
+      })),
+    });
+
+    for (const emp of emps) {
+      const sEmp = st.get({ bold: true, color: textColor(emp.color), fill: argb(emp.color), border: true, align: { v: "center" } });
+      const cells = [{ v: `${emp.kuerzel || ""}  ${emp.name}`, s: sEmp }];
+      for (const iso of dates) {
+        const parts = [];
+        for (const a of assigns) {
+          if (a.employee_id === emp.id && a.date === iso) {
+            const mark = KIND_MARK[a.kind] || "";
+            const home = a.work_mode === "home" ? " ⌂" : "";
+            parts.push(`${a.start_time}–${a.end_time}${mark ? " " + mark : ""}${home}`);
+          }
+        }
+        parts.push(...absOn(absences, emp.id, iso, absCat));
+        cells.push({ v: parts.join("\n"), s: sCell });
+      }
+      aushang.rows.push({ h: 42, cells });
+    }
+
+    /* -------------------------- Abrechnung --------------------------- */
+    const abr = { name: "Abrechnung", freeze: { x: 1, y: 3 }, merges: ["A1:K1"], rows: [], cols: [{ w: 26 }] };
+    for (let c = 0; c < 10; c++) abr.cols.push({ w: 8 });
+
+    abr.rows.push({ cells: [{ v: `Stundenabrechnung · ${loc.name} · KW ${week}`, s: st.get({ bold: true, size: 13, color: NAVY }) }] });
+    abr.rows.push({ cells: [] });
+    abr.rows.push({
+      cells: [{ v: "Mitarbeiter", s: sHeadLeft }]
+        .concat(WD.map((w) => ({ v: w.slice(0, 2), s: sHead })))
+        .concat([{ v: "Summe", s: sHead }, { v: "Soll", s: sHead }, { v: "Diff", s: sHead }]),
+    });
+
+    for (const emp of emps) {
+      const dayMin = [0, 0, 0, 0, 0, 0, 0];
+      for (const a of assigns) {
+        if (a.employee_id !== emp.id || a.kind === "event") continue;
+        const idx = dates.indexOf(a.date);
+        if (idx >= 0) dayMin[idx] += toMin(a.end_time) - toMin(a.start_time);
+      }
+      let total = 0;
+      const cells = [{ v: `${emp.kuerzel || ""} ${emp.name}`, s: sName }];
+      dayMin.forEach((m) => {
+        const h = m / 60; total += h;
+        cells.push({ v: h ? Math.round(h * 100) / 100 : "", n: !!h, s: sNum });
+      });
+      const soll = emp.weekly_hours || 0;
+      const diff = Math.round((total - soll) * 100) / 100;
+      cells.push({ v: Math.round(total * 100) / 100, n: true, s: sNumBold });
+      cells.push({ v: soll, n: true, s: sNum });
+      cells.push({ v: diff, n: true, s: diff < 0 ? sNeg : sPos });
+      abr.rows.push({ cells });
+    }
+
+    const buffer = DP.xlsx.build({ sheets: [aushang, abr], stylesXml: st.xml() });
+    return { filename: `Dienstplan_${loc.kuerzel || loc.name}_KW${week}.xlsx`, buffer };
+  }
+
+  DP.excel = { exportExcel };
+})();
+
+/* Speicher-Schicht mit austauschbarem Backend.
+   - local : localStorage (Arbeits-Cache / Offline-Puffer). Immer aktiv.
+   - drive : Google Drive via window.claude.mcp (Artifact) - Phase 4.
+             JSON-Snapshots "dienstplaner-daten-<zeit>.json", neueste gewinnt.
+   Merge-Regel: beim Start neuesten Drive-Stand laden, sonst localStorage,
+   sonst Demo-Seed. Jede Aenderung -> localStorage sofort, Drive gedrosselt. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+
+  const LS_KEY = "dp-doc-v1";
+  const FILE_PREFIX = "dienstplaner-daten-";
+
+  const state = {
+    doc: null,
+    driveEnabled: false,      // Phase 4: true, wenn mcp-Capability vorhanden
+    driveStatus: "aus",       // aus | ok | fehler | laedt
+    lastSavedAt: null,
+    saveTimer: null,
+    listeners: [],
+  };
+
+  /* ------------------------------ intern ------------------------------ */
+  function nowStamp() {
+    const n = new Date();
+    const p = (x) => String(x).padStart(2, "0");
+    return `${n.getFullYear()}-${p(n.getMonth() + 1)}-${p(n.getDate())}_${p(n.getHours())}-${p(n.getMinutes())}-${p(n.getSeconds())}`;
+  }
+
+  function loadLocal() {
+    try {
+      const raw = globalThis.localStorage && localStorage.getItem(LS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* kein localStorage / kaputt */ }
+    return null;
+  }
+
+  function saveLocal(doc) {
+    try {
+      if (globalThis.localStorage) localStorage.setItem(LS_KEY, JSON.stringify(doc));
+    } catch (e) { /* Speicher voll o.ae. - Drive/Export bleiben */ }
+  }
+
+  function notify() { state.listeners.forEach((fn) => { try { fn(state); } catch (e) {} }); }
+
+  /* --------------------------- Drive (Phase 4) ------------------------ */
+  // Wird in Phase 4 mit echten window.claude.mcp-Aufrufen gefuellt.
+  // Schnittstelle: driveAdapter = { listNewest():Promise<{name,content}|null>,
+  //                                 save(name, content):Promise<void> }
+  let driveAdapter = null;
+  function setDriveAdapter(adapter) {
+    driveAdapter = adapter;
+    state.driveEnabled = !!adapter;
+    state.driveStatus = adapter ? "ok" : "aus";
+    notify();
+  }
+
+  async function loadFromDrive() {
+    if (!driveAdapter) return null;
+    state.driveStatus = "laedt"; notify();
+    try {
+      const newest = await driveAdapter.listNewest();
+      state.driveStatus = "ok"; notify();
+      if (newest && newest.content) return JSON.parse(newest.content);
+    } catch (e) {
+      state.driveStatus = "fehler"; notify();
+    }
+    return null;
+  }
+
+  async function saveToDrive(doc) {
+    if (!driveAdapter) return;
+    try {
+      await driveAdapter.save(FILE_PREFIX + nowStamp() + ".json", JSON.stringify(doc));
+      state.driveStatus = "ok";
+      state.lastSavedAt = new Date();
+    } catch (e) {
+      state.driveStatus = "fehler";
+    }
+    notify();
+  }
+
+  /* ------------------------------ API --------------------------------- */
+  async function init() {
+    let doc = null;
+    if (state.driveEnabled) doc = await loadFromDrive();
+    if (!doc) doc = loadLocal();
+    if (!doc) doc = DP.model.seedDemo(DP.model.emptyDoc());
+    DP.model.migrate(doc);
+    state.doc = doc;
+    saveLocal(doc);
+    notify();
+    return doc;
+  }
+
+  /** Nach jeder Aenderung aufrufen: sofort lokal, Drive gedrosselt (8s). */
+  function markDirty() {
+    saveLocal(state.doc);
+    if (state.driveEnabled) {
+      clearTimeout(state.saveTimer);
+      state.saveTimer = setTimeout(() => saveToDrive(state.doc), 8000);
+    }
+    notify();
+  }
+
+  /** Sofort speichern (z.B. Knopf "Jetzt sichern" / vor Export). */
+  async function flush() {
+    saveLocal(state.doc);
+    clearTimeout(state.saveTimer);
+    if (state.driveEnabled) await saveToDrive(state.doc);
+  }
+
+  function exportJSON() {
+    return {
+      filename: FILE_PREFIX + nowStamp() + ".json",
+      content: JSON.stringify(state.doc, null, 1),
+    };
+  }
+
+  function importJSON(text) {
+    const doc = JSON.parse(text);
+    if (!doc || doc.schema !== "dienstplaner-mobil-v1") throw new Error("Unbekanntes Datei-Format");
+    state.doc = doc;
+    saveLocal(doc);
+    notify();
+    return doc;
+  }
+
+  function resetDemo() {
+    state.doc = DP.model.seedDemo(DP.model.emptyDoc());
+    saveLocal(state.doc);
+    notify();
+    return state.doc;
+  }
+
+  const onChange = (fn) => state.listeners.push(fn);
+
+  DP.storage = {
+    state, init, markDirty, flush, exportJSON, importJSON, resetDemo,
+    setDriveAdapter, FILE_PREFIX,
+  };
+})();
+
+/* Mobile-UI des Dienstplaners. Rendert alles in #app.
+   Tabs: Plan / Setup / Mails / Team / Export. Bearbeitung ueber Bottom-Sheets. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+  if (typeof document === "undefined") return; // Node-Tests
+
+  /* ------------------------------ Helfer ------------------------------ */
+  const $ = (s, r) => (r || document).querySelector(s);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const pad = (n) => String(n).padStart(2, "0");
+  const toMin = DP.planner.toMin, toHHMM = DP.planner.toHHMM;
+  const WD = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+  const WDS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  const MON = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  const PALETTE = ["#2E7D5B", "#3B6FB0", "#C99A2E", "#7A5AA6", "#2E8B7F", "#B5654B", "#4A6FA5", "#8E44AD", "#16A085", "#2F5D8A"];
+
+  const IC = {
+    cal: '<rect x="3.5" y="4.5" width="17" height="16" rx="2"/><line x1="3.5" y1="9" x2="20.5" y2="9"/><line x1="8" y1="2.5" x2="8" y2="6"/><line x1="16" y1="2.5" x2="16" y2="6"/>',
+    slid: '<line x1="4" y1="7" x2="20" y2="7"/><circle cx="9" cy="7" r="2.1"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="15" cy="17" r="2.1"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    team: '<circle cx="9" cy="8" r="3.1"/><path d="M3.6 20a5.4 5.4 0 0 1 10.8 0"/><path d="M16 5.3a3.1 3.1 0 0 1 0 5.6"/><path d="M17.5 14.3A5.4 5.4 0 0 1 20.4 19"/>',
+    out: '<path d="M12 3v11"/><path d="M8 11l4 4 4-4"/><path d="M4.5 20h15"/>',
+    chevL: '<path d="M15 5l-7 7 7 7"/>', chevR: '<path d="M9 5l7 7-7 7"/>',
+    wand: '<circle cx="12" cy="12" r="2.6"/><path d="M12 3v2.4M12 18.6V21M3 12h2.4M18.6 12H21M5.6 5.6l1.7 1.7M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/>',
+    alert: '<path d="M12 3.5 2.8 20h18.4L12 3.5Z"/><line x1="12" y1="10" x2="12" y2="14.4"/>',
+    sun: '<circle cx="12" cy="12" r="3.8"/><path d="M12 2v2.2M12 19.8V22M2 12h2.2M19.8 12H22M4.8 4.8l1.6 1.6M17.6 17.6l1.6 1.6M19.2 4.8l-1.6 1.6M6.4 17.6l-1.6 1.6"/>',
+    moon: '<path d="M20 14.4A8 8 0 1 1 9.6 4 6.5 6.5 0 0 0 20 14.4Z"/>',
+    anchor: '<circle cx="12" cy="5" r="2.3"/><line x1="12" y1="7.3" x2="12" y2="21"/><path d="M5 12a7 7 0 0 0 14 0"/><line x1="3.4" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="20.6" y2="12"/>',
+    inbox: '<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M4 13 6.4 5.6A2 2 0 0 1 8.3 4.2h7.4a2 2 0 0 1 1.9 1.4L20 13v4.8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>',
+    copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>',
+  };
+  const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ""}</svg>`;
+
+  function hexText(hex) {
+    const h = (hex || "#888").replace("#", "");
+    const v = (i) => { const c = parseInt(h.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    return (0.2126 * v(0) + 0.7152 * v(2) + 0.0722 * v(4)) > 0.5 ? "#12212f" : "#f2f6fb";
+  }
+  const catalog = (name) => { const m = {}; (S.doc.settings[name] || []).forEach((x) => x && x.id && (m[x.id] = x)); return m; };
+
+  function mondayOf(d) { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); x.setHours(0, 0, 0, 0); return x; }
+  const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parseISO = (s) => new Date(s + "T00:00:00");
+  const wk = () => DP.planner.isoWeekOf(S.monday);
+  function weekDates() { const out = []; for (let i = 0; i < 7; i++) { const d = new Date(S.monday); d.setDate(d.getDate() + i); out.push(isoOf(d)); } return out; }
+
+  /* ------------------------------ Zustand ----------------------------- */
+  const S = {
+    doc: null, tab: "plan", locId: null, monday: mondayOf(new Date()), day: 0,
+    lastPlan: null, avail: { weeks: [], parsed: [] },
+  };
+  const loc = () => S.doc.locations.find((l) => l.id === S.locId);
+  const locEmps = () => S.doc.employees.filter((e) => e.location_id === S.locId && e.active !== 0);
+  const empById = (id) => S.doc.employees.find((e) => e.id === id);
+  const inWeek = (r) => { const { year, week } = wk(); return r.location_id === S.locId && r.iso_year === year && r.iso_week === week; };
+
+  /* ------------------------------ Toast ------------------------------- */
+  function toast(msg, k = "info") {
+    let wrap = $("#toasts");
+    if (!wrap) { // UI evtl. noch nicht gebaut -> eigenen Container anlegen
+      wrap = document.createElement("div");
+      wrap.className = "toasts"; wrap.id = "toasts";
+      document.body.appendChild(wrap);
+    }
+    const el = document.createElement("div");
+    el.className = "toast"; el.dataset.k = k;
+    el.innerHTML = `<i></i><span>${esc(msg)}</span>`;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  /* ------------------------------ Dateien ----------------------------- */
+  const DL_EXT = ["json", "txt", "md", "png", "jpg", "jpeg", "webp", "gif", "mp4", "webm"];
+  async function saveFile(filename, data, mime) {
+    // claude.downloads nur fuer erlaubte Endungen; sonst Blob-Download
+    const ext = (filename.split(".").pop() || "").toLowerCase();
+    const cd = globalThis.claude && globalThis.claude.downloads;
+    if (cd && cd.save && DL_EXT.includes(ext)) {
+      try { await cd.save({ filename, data }); toast("Datei gespeichert: " + filename, "success"); return; }
+      catch (e) { if (e && e.code === "declined") { toast("Speichern abgebrochen", "info"); return; } }
+    }
+    const blob = data instanceof Uint8Array ? new Blob([data], { type: mime }) : new Blob([data], { type: mime + ";charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast("Heruntergeladen: " + filename, "success");
+  }
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); toast("Kopiert ✓", "success"); return true; }
+    catch (e) { return false; }
+  }
+  /** Text-Anzeige-Sheet mit Kopier-Fallback (Zwischenablage geht nur ueber https). */
+  function showTextSheet(title, explain, text) {
+    const body = `${explain ? `<p class="muted">${explain}</p>` : ""}
+      <textarea class="ctl" id="ts-text" readonly style="min-height:220px">${esc(text)}</textarea>`;
+    const foot = `<button class="btn btn--pri" data-copy>${icon("copy")} Kopieren</button>
+      <span class="sp"></span><button class="btn" data-x>Schließen</button>`;
+    const { dlg } = sheet({ title, body, foot });
+    const ta = dlg.querySelector("#ts-text");
+    ta.addEventListener("focus", () => ta.select());
+    dlg.querySelector("[data-copy]").addEventListener("click", async () => {
+      if (!(await copyText(text))) { ta.focus(); ta.select(); toast("Bitte markierten Text manuell kopieren (Gedrückt halten → Kopieren)", "info"); }
+    });
+  }
+
+  /* ------------------------------ Sheet ------------------------------- */
+  function sheet({ title, body, foot }) {
+    const dlg = document.createElement("dialog");
+    dlg.className = "sheet";
+    dlg.innerHTML = `<div class="sheet__box"><div class="sheet__grip"></div>
+      <div class="sheet__head"><div class="ti">${esc(title)}</div>
+        <button class="btn btn--icon btn--ghost" data-x>✕</button></div>
+      <div class="sheet__body">${body}</div>
+      <div class="sheet__foot">${foot}</div></div>`;
+    document.body.appendChild(dlg);
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-x]")) close(); });
+    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+    dlg.showModal();
+    return { dlg, close };
+  }
+  const segWire = (dlg, sel) => dlg.querySelector(sel).addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    dlg.querySelectorAll(sel + " button").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+  });
+  const segVal = (dlg, sel) => dlg.querySelector(sel + " .on").dataset.v;
+
+  /* ============================== RENDER =============================== */
+  function render() {
+    const l = loc();
+    const tabs = [
+      ["plan", "cal", "Plan"], ["setup", "slid", "Setup"], ["mails", "inbox", "Mails"],
+      ["team", "team", "Team"], ["export", "out", "Export"],
+    ];
+    $("#app").innerHTML = `
+      <header class="hdr">
+        <button class="btn btn--icon btn--ghost" data-a="loc" title="Standort wechseln">${icon("anchor")}</button>
+        <div class="hdr__title"><i class="dot" style="background:${esc(l.color)}"></i><span>${esc(l.name)}</span></div>
+        <div class="hdr__spacer"></div>
+        <button class="btn btn--icon btn--ghost" data-a="theme">${icon(document.documentElement.dataset.theme === "light" ? "moon" : "sun")}</button>
+      </header>
+      <div class="screen" id="screen"></div>
+      <nav class="tabs">${tabs.map(([id, ic, lb]) =>
+        `<button class="${S.tab === id ? "on" : ""}" data-tab="${id}">${icon(ic)}<span>${lb}</span></button>`).join("")}</nav>
+      <div class="toasts" id="toasts"></div>`;
+
+    $(".hdr").onclick = (e) => {
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      if (b.dataset.a === "theme") {
+        const cur = document.documentElement.dataset.theme || "dark";
+        document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+        try { localStorage.setItem("dp-theme", document.documentElement.dataset.theme); } catch (err) {}
+        render();
+      } else if (b.dataset.a === "loc") pickLocation();
+    };
+    $(".tabs").onclick = (e) => {
+      const b = e.target.closest("[data-tab]"); if (!b) return;
+      S.tab = b.dataset.tab; render();
+    };
+
+    const scr = $("#screen");
+    if (S.tab === "plan") renderPlan(scr);
+    else if (S.tab === "setup") renderSetup(scr);
+    else if (S.tab === "mails") renderMails(scr);
+    else if (S.tab === "team") renderTeam(scr);
+    else renderExport(scr);
+  }
+
+  function pickLocation() {
+    const body = `<div class="list">${S.doc.locations.map((l) => `
+      <button class="item" data-loc="${l.id}"><span class="bar" style="--c:${esc(l.color)}"></span>
+        <span class="bd"><span class="ti">${esc(l.name)}</span>
+        <span class="mt">${S.doc.employees.filter((e) => e.location_id === l.id && e.active !== 0).length} Mitarbeiter</span></span>
+        ${l.id === S.locId ? '<span class="tag" style="--c:var(--accent)">aktiv</span>' : ""}</button>`).join("")}</div>`;
+    const { dlg, close } = sheet({ title: "Standort", body, foot: '<button class="btn btn--block" data-x>Schließen</button>' });
+    dlg.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-loc]"); if (!b) return;
+      S.locId = +b.dataset.loc; close(); render();
+    });
+  }
+
+  /* ------------------------------ PLAN --------------------------------- */
+  function renderPlan(scr) {
+    const { year, week } = wk();
+    const dates = weekDates();
+    const today = isoOf(new Date());
+    const l = loc();
+    const hol = DP.holidays.holidaysFor(year, l.bundesland);
+    const hol2 = DP.holidays.holidaysFor(year + 1, l.bundesland);
+    const holOf = (iso2) => hol[iso2] || hol2[iso2];
+    const assigns = S.doc.assignments.filter(inWeek);
+    const warnCount = S.lastPlan && S.lastPlan.week === week && S.lastPlan.year === year ? S.lastPlan.warnings.length : null;
+
+    // Stunden je Person
+    const mins = {};
+    locEmps().forEach((e) => (mins[e.id] = 0));
+    assigns.forEach((a) => { if (mins[a.employee_id] != null && a.kind !== "event") mins[a.employee_id] += toMin(a.end_time) - toMin(a.start_time); });
+
+    const d0 = parseISO(dates[0]), d6 = parseISO(dates[6]);
+    scr.innerHTML = `
+      <div style="display:flex;flex-direction:column;min-height:100%">
+        <div class="planbar">
+          <button class="btn btn--icon btn--ghost" data-a="prev">${icon("chevL")}</button>
+          <div style="flex:1;text-align:center"><div class="kw">KW ${week}</div>
+            <div class="rng">${d0.getDate()}. ${MON[d0.getMonth()]} – ${d6.getDate()}. ${MON[d6.getMonth()]} ${d6.getFullYear()}</div></div>
+          <button class="btn btn--icon btn--ghost" data-a="next">${icon("chevR")}</button>
+          ${warnCount === null ? "" : `<button class="badge ${warnCount ? "" : "ok"}" data-a="warn">${warnCount || "✓"}</button>`}
+        </div>
+        <div class="weekstrip">${dates.map((iso2, i) => {
+          const d = parseISO(iso2);
+          const n = assigns.filter((a) => a.date === iso2).length;
+          return `<button class="wchip ${iso2 === today ? "today" : ""} ${holOf(iso2) ? "hol" : ""}" data-day="${i}">
+            <small>${WDS[i]}</small><b>${d.getDate()}</b>
+            <span class="load">${"<i></i>".repeat(Math.min(3, n))}</span></button>`;
+        }).join("")}</div>
+        <div class="allday" id="allday"></div>
+        <div style="flex:1;overflow:auto" id="calwrap"></div>
+        <div class="hours">${locEmps().map((e) => {
+          const h = Math.round((mins[e.id] / 60) * 10) / 10;
+          return `<span class="hchip"><i style="background:${esc(e.color)}"></i><b>${esc(e.kuerzel)}</b>
+            <span class="mono">${h}${e.weekly_hours ? "/" + e.weekly_hours : ""} h</span></span>`;
+        }).join("")}</div>
+        <div class="fab-row">
+          <button class="btn" data-a="today">Heute</button>
+          <button class="btn btn--pri" data-a="plan">${icon("wand")} Auto-Plan</button>
+        </div>
+      </div>`;
+
+    renderAllday(dates);
+    renderGrid(dates, holOf, assigns, today);
+    // Beim Start zur heutigen Spalte wischen (nur wenn horizontal scrollbar)
+    if (dates.includes(today)) scrollToDay(dates.indexOf(today), false);
+
+    scr.onclick = async (e) => {
+      const dayBtn = e.target.closest("[data-day]");
+      if (dayBtn) { scrollToDay(+dayBtn.dataset.day, true); return; }
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      const a = b.dataset.a;
+      if (a === "prev") { S.monday.setDate(S.monday.getDate() - 7); renderPlan(scr); }
+      else if (a === "next") { S.monday.setDate(S.monday.getDate() + 7); renderPlan(scr); }
+      else if (a === "today") { S.monday = mondayOf(new Date()); renderPlan(scr); }
+      else if (a === "warn") showWarnings();
+      else if (a === "plan") {
+        b.disabled = true;
+        const res = DP.planner.generate(S.doc, S.locId, year, week);
+        S.lastPlan = res; DP.storage.markDirty();
+        renderPlan(scr);
+        toast(`Plan erstellt · ${res.created} Schichten${res.warnings.length ? ` · ${res.warnings.length} Warnung(en)` : " · keine Konflikte"}`, res.warnings.length ? "info" : "success");
+      }
+    };
+  }
+
+  function renderAllday(dates) {
+    const cat = catalog("absence_types");
+    const el = $("#allday");
+    const chips = [];
+    for (const a of S.doc.absences) {
+      const emp = empById(a.employee_id);
+      if (!emp || emp.location_id !== S.locId) continue;
+      const { year, week } = wk();
+      if (a.iso_year !== year || a.iso_week !== week) continue;
+      const t = cat[a.type] || { label: a.type, color: "#8894a2" };
+      let when = "";
+      if (a.date) {
+        const i0 = dates.indexOf(a.date);
+        if (a.end_date) { const i1 = dates.indexOf(a.end_date); when = ` (${WDS[Math.max(0, i0)]}–${WDS[i1 >= 0 ? i1 : 6]})`; }
+        else if (i0 >= 0) when = ` (${WDS[i0]})`;
+      }
+      chips.push(`<span class="schip" style="--c:${esc(t.color)}"><i></i>${esc(emp.kuerzel)} · ${esc(t.label)}${when}</span>`);
+    }
+    el.innerHTML = chips.join("");
+  }
+
+  function scrollToDay(i, smooth) {
+    const wrap = $("#calwrap");
+    if (!wrap || wrap.scrollWidth <= wrap.clientWidth + 4) return; // alles sichtbar
+    const cols = wrap.querySelectorAll(".dcol");
+    if (!cols[i]) return;
+    const axisW = wrap.querySelector(".axis") ? wrap.querySelector(".axis").offsetWidth : 48;
+    wrap.scrollTo({ left: Math.max(0, cols[i].offsetLeft - axisW), behavior: smooth ? "smooth" : "auto" });
+  }
+
+  function renderGrid(dates, holOf, assigns, today) {
+    const view = S.doc.settings.view || {};
+    const sH = view.start_hour || 7, eH = view.end_hour || 20;
+    const pxH = 56;
+    const gridH = (eH - sH) * pxH;
+    const show = dates;
+    const op = {};
+    S.doc.operating_hours.filter((o) => o.location_id === S.locId).forEach((o) => (op[o.weekday] = o));
+    const special = {};
+    S.doc.special_days.filter((s) => s.location_id === S.locId).forEach((s) => (special[s.date] = s));
+
+    let axis = `<div class="axis" style="height:${gridH}px">`;
+    for (let h = sH; h <= eH; h++) axis += `<div class="tick" style="top:${(h - sH) * pxH}px">${pad(h)}</div>`;
+    axis += "</div>";
+
+    let heads = "", cols = "";
+    show.forEach((iso2) => {
+      const wd = DP.planner.weekdayOfISO(iso2);
+      const d = parseISO(iso2);
+      const hol = holOf(iso2);
+      heads += `<div class="dhead ${iso2 === today ? "today" : ""}">${WDS[wd]} ${d.getDate()}.${d.getMonth() + 1}.${hol ? `<small>${esc(hol)}</small>` : ""}</div>`;
+      const sp = special[iso2], oh = op[wd];
+      const closed = sp ? sp.closed : oh ? oh.closed : 0;
+      const openMin = closed ? null : toMin((sp && sp.open_time) || (oh && oh.open_time) || "08:00");
+      const closeMin = closed ? null : toMin((sp && sp.close_time) || (oh && oh.close_time) || "18:00");
+
+      let blocks = "";
+      if (!closed) {
+        if (openMin > sH * 60) blocks += `<div class="edge" style="top:0;height:${((openMin - sH * 60) / 60) * pxH}px"></div>`;
+        if (closeMin < eH * 60) blocks += `<div class="edge" style="top:${((closeMin - sH * 60) / 60) * pxH}px;bottom:0"></div>`;
+      }
+      const evs = assigns.filter((a) => a.date === iso2).map((a) => ({ a, s: toMin(a.start_time), e: toMin(a.end_time) }));
+      packEvents(evs).forEach((ev) => {
+        const emp = empById(ev.a.employee_id) || {};
+        const top = ((ev.s - sH * 60) / 60) * pxH, hpx = Math.max(22, ((ev.e - ev.s) / 60) * pxH);
+        let label = "";
+        if (ev.a.kind === "kurs") { const c = S.doc.courses.find((x) => x.id === ev.a.course_id); label = (c && c.title) || "Kurs"; }
+        else if (ev.a.kind === "zbv") label = ev.a.task_text || "Aufgabe";
+        else if (ev.a.kind === "telefon") label = "Telefon" + (ev.a.work_mode === "home" ? " · Zuhause" : "");
+        blocks += `<div class="shift ${ev.a.work_mode === "home" ? "home" : ""} ${ev.a.locked ? "locked" : ""}"
+          data-kind="${ev.a.kind}" data-id="${ev.a.id}"
+          style="top:${top}px;height:${hpx}px;left:calc(${ev.left * 100}% + 3px);width:calc(${ev.width * 100}% - 6px);background:${esc(emp.color)};color:${hexText(emp.color)}">
+          <b>${esc(emp.kuerzel || "?")} <span class="t">${ev.a.start_time}–${ev.a.end_time}</span></b>
+          ${label && hpx > 40 ? `<span class="l">${esc(label)}</span>` : ""}</div>`;
+      });
+      let now = "";
+      if (iso2 === today) {
+        const n = new Date(); const nm = n.getHours() * 60 + n.getMinutes();
+        if (nm >= sH * 60 && nm <= eH * 60) now = `<div class="nowline" style="top:${((nm - sH * 60) / 60) * pxH}px"></div>`;
+      }
+      cols += `<div class="dcol ${iso2 === today ? "today" : ""} ${closed ? "closed" : ""}" style="height:${gridH}px" data-date="${iso2}">${blocks}${now}</div>`;
+    });
+
+    $("#calwrap").innerHTML =
+      `<div class="cal cal--week"><div class="corner"></div>${heads}${axis}${cols}</div>`;
+
+    $("#calwrap").onclick = (e) => {
+      const sEl = e.target.closest(".shift");
+      if (sEl) {
+        const a = S.doc.assignments.find((x) => x.id === +sEl.dataset.id);
+        if (a) shiftSheet(a);
+        return;
+      }
+      const col = e.target.closest(".dcol");
+      if (col) {
+        const rect = col.getBoundingClientRect();
+        const min = sH * 60 + ((e.clientY - rect.top) / pxH) * 60;
+        const snap = Math.max(sH * 60, Math.min(eH * 60 - 60, Math.round(min / 15) * 15));
+        shiftSheet({ date: col.dataset.date, start_time: toHHMM(snap), end_time: toHHMM(snap + 60) });
+      }
+    };
+  }
+
+  function packEvents(evs) {
+    evs.sort((a, b) => a.s - b.s || a.e - b.e);
+    let group = [], groupEnd = -1;
+    const flush = () => {
+      const ends = [];
+      group.forEach((ev) => {
+        let placed = false;
+        for (let i = 0; i < ends.length; i++) if (ends[i] <= ev.s) { ends[i] = ev.e; ev.col = i; placed = true; break; }
+        if (!placed) { ev.col = ends.length; ends.push(ev.e); }
+      });
+      group.forEach((ev) => { ev.left = ev.col / ends.length; ev.width = 1 / ends.length; });
+      group = []; groupEnd = -1;
+    };
+    evs.forEach((ev) => {
+      if (group.length && ev.s >= groupEnd) flush();
+      group.push(ev); groupEnd = Math.max(groupEnd, ev.e);
+    });
+    if (group.length) flush();
+    return evs;
+  }
+
+  function showWarnings() {
+    const w = (S.lastPlan && S.lastPlan.warnings) || [];
+    const body = w.length ? `<div class="list">${w.map((x) => {
+      const d = parseISO(x.date);
+      return `<div class="warnitem" data-sev="${x.severity}"><i></i><div>
+        <div class="d">${WDS[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1}.</div>
+        <div>${esc(x.message)}</div></div></div>`;
+    }).join("")}</div>` : `<p class="muted">Keine Konflikte in dieser Woche.</p>`;
+    sheet({ title: `Warnungen (${w.length})`, body, foot: '<button class="btn btn--block" data-x>Schließen</button>' });
+  }
+
+  /* --------------------------- Schicht-Sheet --------------------------- */
+  function shiftSheet(a) {
+    const isNew = !a.id;
+    const emps = locEmps();
+    const rooms = S.doc.rooms.filter((r) => r.location_id === S.locId);
+    const kinds = S.doc.settings.shift_kinds || [];
+    const dates = weekDates();
+    const empId = a.employee_id || (emps[0] && emps[0].id);
+
+    const body = `
+      <div class="field"><label>Mitarbeiter</label><select class="ctl" id="s-emp">
+        ${emps.map((e) => `<option value="${e.id}" ${e.id === empId ? "selected" : ""}>${esc(e.kuerzel)} · ${esc(e.name)}</option>`).join("")}</select></div>
+      <div class="frow">
+        <div class="field"><label>Art</label><select class="ctl" id="s-kind">
+          ${kinds.map((k) => `<option value="${k.id}" ${k.id === (a.kind || "dienst") ? "selected" : ""}>${esc(k.label)}</option>`).join("")}</select></div>
+        <div class="field"><label>Datum</label><input type="date" class="ctl" id="s-date" value="${esc(a.date)}" min="${dates[0]}" max="${dates[6]}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Von</label><input type="time" class="ctl" id="s-start" value="${esc(a.start_time || "08:00")}" step="900"></div>
+        <div class="field"><label>Bis</label><input type="time" class="ctl" id="s-end" value="${esc(a.end_time || "16:00")}" step="900"></div>
+      </div>
+      <div class="field"><label>Arbeitsort</label><div class="seg" id="s-mode">
+        <button type="button" data-v="onsite" class="${(a.work_mode || "onsite") === "onsite" ? "on" : ""}">Vor Ort</button>
+        <button type="button" data-v="home" class="${a.work_mode === "home" ? "on" : ""}">Homeoffice</button></div></div>
+      <div class="frow">
+        <div class="field"><label>Raum</label><select class="ctl" id="s-room"><option value="">—</option>
+          ${rooms.map((r) => `<option value="${r.id}" ${r.id === a.room_id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Aufgabe</label><input class="ctl" id="s-task" value="${esc(a.task_text || "")}" placeholder="z.B. umbauen Raum 2+3"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="s-lock" ${a.id ? (a.locked ? "checked" : "") : "checked"}> Fixieren (Auto-Plan lässt die Schicht stehen)</label>`;
+    const foot = `${isNew ? "" : '<button class="btn btn--danger" data-del>Löschen</button>'}
+      <span class="sp"></span><button class="btn" data-x>Abbrechen</button>
+      <button class="btn btn--pri" data-save>Speichern</button>`;
+    const { dlg, close } = sheet({ title: isNew ? "Neue Schicht" : "Schicht bearbeiten", body, foot });
+    segWire(dlg, "#s-mode");
+
+    dlg.querySelector("[data-save]").addEventListener("click", () => {
+      const g = (id) => dlg.querySelector(id);
+      const date = g("#s-date").value, st = g("#s-start").value, en = g("#s-end").value;
+      if (!date || !st || !en) return toast("Datum und Zeiten angeben", "error");
+      if (en <= st) return toast("Ende muss nach Beginn liegen", "error");
+      const iso2 = DP.planner.isoWeekOf(parseISO(date));
+      const data = {
+        location_id: S.locId, iso_year: iso2.year, iso_week: iso2.week,
+        employee_id: +g("#s-emp").value, date, start_time: st, end_time: en,
+        kind: g("#s-kind").value, work_mode: segVal(dlg, "#s-mode"),
+        room_id: g("#s-room").value ? +g("#s-room").value : null,
+        task_text: g("#s-task").value.trim() || null,
+        course_id: a.course_id || null, status_type: a.status_type || null,
+        locked: g("#s-lock").checked ? 1 : 0, auto_generated: 0,
+      };
+      if (isNew) DP.model.insert(S.doc, "assignments", data);
+      else DP.model.update(S.doc, "assignments", a.id, data);
+      DP.storage.markDirty(); close(); render(); toast("Schicht gespeichert", "success");
+    });
+    const del = dlg.querySelector("[data-del]");
+    if (del) del.addEventListener("click", () => {
+      DP.model.remove(S.doc, "assignments", a.id);
+      DP.storage.markDirty(); close(); render(); toast("Schicht gelöscht", "success");
+    });
+  }
+
+  /* ------------------------------ SETUP -------------------------------- */
+  function renderSetup(scr) {
+    const { week } = wk();
+    const absCat = catalog("absence_types"), ctCat = catalog("course_types");
+    const roomName = (id) => { const r = S.doc.rooms.find((x) => x.id === id); return r ? r.name : ""; };
+    const fmtD = (iso2) => { const d = parseISO(iso2); return `${WDS[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1}.`; };
+    const { year } = wk();
+    const inW = (r) => r.iso_year === year && r.iso_week === week;
+
+    const absRows = S.doc.absences.filter((a) => { const e = empById(a.employee_id); return e && e.location_id === S.locId && inW(a); })
+      .map((a) => {
+        const e = empById(a.employee_id); const t = absCat[a.type] || { label: a.type, color: "#8894a2" };
+        const when = a.date ? (a.end_date ? `${fmtD(a.date)}–${fmtD(a.end_date)}` : fmtD(a.date)) : "ganze Woche";
+        return `<button class="item" data-e="abs:${a.id}" style="--c:${esc(t.color)}"><span class="bar"></span>
+          <span class="bd"><span class="ti">${esc(e.kuerzel)} — ${esc(e.name)}</span>
+          <span class="mt">${when}${a.period && a.period !== "ganztags" ? " · " + a.period : ""}${a.priority === "wunsch" ? " · Wunsch" : ""}</span></span>
+          <span class="tag">${esc(t.label)}</span></button>`;
+      }).join("") || '<div class="empty">Keine Abwesenheiten diese Woche.</div>';
+
+    const courseRows = S.doc.courses.filter((c) => c.location_id === S.locId && inW(c)).map((c) => {
+      const t = ctCat[c.type] || { label: c.type, color: "#8894a2" };
+      const staff = c.staff_needed ? `${c.staff_needed} Pers.${c.role_required ? " (" + c.role_required + ")" : ""}` : "ohne Personal";
+      const when = c.end_date && c.end_date > c.date ? `${fmtD(c.date)}–${fmtD(c.end_date)}` : fmtD(c.date);
+      return `<button class="item" data-e="course:${c.id}" style="--c:${esc(t.color)}"><span class="bar"></span>
+        <span class="bd"><span class="ti">${esc(c.title || "Kurs")}</span>
+        <span class="mt">${when} ${c.start_time}–${c.end_time}${c.room_id ? " · " + esc(roomName(c.room_id)) : ""} · ${staff}</span></span>
+        <span class="tag">${esc(t.label)}</span></button>`;
+    }).join("") || '<div class="empty">Keine Kurse diese Woche.</div>';
+
+    const taskRows = S.doc.tasks.filter((t) => t.location_id === S.locId && inW(t)).map((t) =>
+      `<button class="item" data-e="task:${t.id}" style="--c:#C99A2E"><span class="bar"></span>
+        <span class="bd"><span class="ti">${esc(t.title || "Aufgabe")}</span>
+        <span class="mt">${fmtD(t.date)} ${t.start_time}–${t.end_time}${t.room_id ? " · " + esc(roomName(t.room_id)) : ""} · ${t.staff_needed || 1} Pers.</span></span>
+        <span class="tag">zbV</span></button>`).join("") || '<div class="empty">Keine Sonderaufgaben diese Woche.</div>';
+
+    scr.innerHTML = `<div class="page">
+      <div><h1>Wochen-Setup · KW ${week}</h1>
+      <p class="muted">Alles, was diese Woche vom Normalfall abweicht — der Auto-Plan berücksichtigt es automatisch.</p></div>
+      <section><div class="rowhead"><h2>Abwesenheiten & Wünsche</h2><span class="sp"></span>
+        <button class="btn btn--sm" data-add="abs">+ Neu</button></div><div class="list">${absRows}</div></section>
+      <section><div class="rowhead"><h2>Kurse</h2><span class="sp"></span>
+        <button class="btn btn--sm" data-add="course">+ Neu</button></div><div class="list">${courseRows}</div></section>
+      <section><div class="rowhead"><h2>Sonderaufgaben (zbV)</h2><span class="sp"></span>
+        <button class="btn btn--sm" data-add="task">+ Neu</button></div><div class="list">${taskRows}</div></section>
+    </div>`;
+
+    scr.onclick = (e) => {
+      const add = e.target.closest("[data-add]"), ed = e.target.closest("[data-e]");
+      if (add) {
+        if (add.dataset.add === "abs") absenceSheet(null);
+        else if (add.dataset.add === "course") courseSheet(null);
+        else taskSheet(null);
+      } else if (ed) {
+        const [k, id] = ed.dataset.e.split(":");
+        if (k === "abs") absenceSheet(S.doc.absences.find((x) => x.id === +id));
+        else if (k === "course") courseSheet(S.doc.courses.find((x) => x.id === +id));
+        else taskSheet(S.doc.tasks.find((x) => x.id === +id));
+      }
+    };
+  }
+
+  function crudSheet({ title, isNew, body, table, rec, buildData, afterWire }) {
+    const foot = `${isNew ? "" : '<button class="btn btn--danger" data-del>Löschen</button>'}
+      <span class="sp"></span><button class="btn" data-x>Abbrechen</button>
+      <button class="btn btn--pri" data-save>Speichern</button>`;
+    const { dlg, close } = sheet({ title, body, foot });
+    if (afterWire) afterWire(dlg);
+    dlg.querySelector("[data-save]").addEventListener("click", () => {
+      const data = buildData(dlg);
+      if (!data) return;
+      if (isNew) DP.model.insert(S.doc, table, data);
+      else DP.model.update(S.doc, table, rec.id, data);
+      DP.storage.markDirty(); close(); render(); toast("Gespeichert", "success");
+    });
+    const del = dlg.querySelector("[data-del]");
+    if (del) del.addEventListener("click", () => {
+      DP.model.remove(S.doc, table, rec.id);
+      DP.storage.markDirty(); close(); render(); toast("Gelöscht", "success");
+    });
+  }
+
+  function absenceSheet(a) {
+    const isNew = !a;
+    const emps = locEmps(), types = S.doc.settings.absence_types || [], dates = weekDates();
+    a = a || { employee_id: emps[0] && emps[0].id, type: types[0] && types[0].id, period: "ganztags", priority: "fix", date: null };
+    const body = `
+      <div class="field"><label>Mitarbeiter</label><select class="ctl" id="a-emp">
+        ${emps.map((e) => `<option value="${e.id}" ${e.id === a.employee_id ? "selected" : ""}>${esc(e.kuerzel)} · ${esc(e.name)}</option>`).join("")}</select></div>
+      <div class="frow">
+        <div class="field"><label>Art</label><select class="ctl" id="a-type">
+          ${types.map((t) => `<option value="${t.id}" ${t.id === a.type ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></div>
+        <div class="field"><label>Tageszeit</label><select class="ctl" id="a-period">
+          ${[["ganztags", "Ganztags"], ["vm", "Vormittags"], ["nm", "Nachmittags"]].map(([v, l]) => `<option value="${v}" ${a.period === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      </div>
+      <label class="check"><input type="checkbox" id="a-week" ${!a.date ? "checked" : ""}> Ganze Woche</label>
+      <div class="frow">
+        <div class="field"><label>Von</label><input type="date" class="ctl" id="a-date" value="${esc(a.date || dates[0])}" min="${dates[0]}" max="${dates[6]}"></div>
+        <div class="field"><label>Bis (optional)</label><input type="date" class="ctl" id="a-end" value="${esc(a.end_date || "")}" min="${dates[0]}" max="${dates[6]}"></div>
+      </div>
+      <div class="field"><label>Priorität</label><div class="seg" id="a-prio">
+        <button type="button" data-v="fix" class="${a.priority !== "wunsch" ? "on" : ""}">Fix</button>
+        <button type="button" data-v="wunsch" class="${a.priority === "wunsch" ? "on" : ""}">Wunsch</button></div></div>`;
+    crudSheet({
+      title: isNew ? "Abwesenheit / Wunsch" : "Abwesenheit bearbeiten", isNew, body,
+      table: "absences", rec: a,
+      afterWire: (dlg) => segWire(dlg, "#a-prio"),
+      buildData: (dlg) => {
+        const g = (id) => dlg.querySelector(id);
+        const { year, week } = wk();
+        const whole = g("#a-week").checked;
+        return {
+          employee_id: +g("#a-emp").value, iso_year: year, iso_week: week,
+          type: g("#a-type").value, period: g("#a-period").value, priority: segVal(dlg, "#a-prio"),
+          date: whole ? null : g("#a-date").value, end_date: whole ? null : (g("#a-end").value || null),
+          start_time: null, end_time: null, note: null,
+        };
+      },
+    });
+  }
+
+  function courseSheet(c) {
+    const isNew = !c;
+    const types = S.doc.settings.course_types || [];
+    const rooms = S.doc.rooms.filter((r) => r.location_id === S.locId);
+    const roles = S.doc.settings.roles || [];
+    const dates = weekDates();
+    c = c || { type: types[0] && types[0].id, date: dates[0], start_time: "18:00", end_time: "20:00", staff_needed: 0 };
+    const body = `
+      <div class="frow">
+        <div class="field"><label>Typ</label><select class="ctl" id="c-type">
+          ${types.map((t) => `<option value="${t.id}" ${t.id === c.type ? "selected" : ""}>${esc(t.label)}</option>`).join("")}</select></div>
+        <div class="field"><label>Titel</label><input class="ctl" id="c-title" value="${esc(c.title || "")}" placeholder="z.B. Excel-Kurs"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Erster Tag</label><input type="date" class="ctl" id="c-date" value="${esc(c.date)}" min="${dates[0]}" max="${dates[6]}"></div>
+        <div class="field"><label>Letzter Tag (optional)</label><input type="date" class="ctl" id="c-enddate" value="${esc(c.end_date || "")}" min="${dates[0]}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Täglich von</label><input type="time" class="ctl" id="c-start" value="${esc(c.start_time)}" step="900"></div>
+        <div class="field"><label>Täglich bis</label><input type="time" class="ctl" id="c-end" value="${esc(c.end_time)}" step="900"></div>
+      </div>
+      <div class="field"><label>Raum</label><select class="ctl" id="c-room"><option value="">—</option>
+        ${rooms.map((r) => `<option value="${r.id}" ${r.id === c.room_id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+      <div class="frow">
+        <div class="field"><label>Personalbedarf</label><input type="number" class="ctl" id="c-staff" value="${c.staff_needed || 0}" min="0" max="10"></div>
+        <div class="field"><label>Rolle</label><select class="ctl" id="c-role"><option value="">—</option>
+          ${roles.map((r) => `<option ${r === c.role_required ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></div>
+      </div>
+      <p class="muted" style="font-size:13px">Präsenz deckt die Grundbesetzung ab (Bedarf 0). Hybrid/Online bekommen eigenes Personal (Bedarf ≥ 1).</p>`;
+    crudSheet({
+      title: isNew ? "Neuer Kurs" : "Kurs bearbeiten", isNew, body, table: "courses", rec: c,
+      buildData: (dlg) => {
+        const g = (id) => dlg.querySelector(id);
+        const iso2 = DP.planner.isoWeekOf(parseISO(g("#c-date").value));
+        const endD = g("#c-enddate").value || null;
+        if (endD && endD < g("#c-date").value) { toast("Letzter Tag liegt vor dem ersten", "error"); return null; }
+        return {
+          location_id: S.locId, iso_year: iso2.year, iso_week: iso2.week, date: g("#c-date").value,
+          end_date: endD,
+          type: g("#c-type").value, title: g("#c-title").value.trim() || null,
+          start_time: g("#c-start").value, end_time: g("#c-end").value,
+          room_id: g("#c-room").value ? +g("#c-room").value : null,
+          staff_needed: +g("#c-staff").value || 0, role_required: g("#c-role").value || null, note: null,
+        };
+      },
+    });
+  }
+
+  function taskSheet(t) {
+    const isNew = !t;
+    const rooms = S.doc.rooms.filter((r) => r.location_id === S.locId);
+    const roles = S.doc.settings.roles || [];
+    const dates = weekDates();
+    t = t || { date: dates[0], start_time: "14:00", end_time: "17:00", staff_needed: 1 };
+    const body = `
+      <div class="field"><label>Titel / Aufgabe</label><input class="ctl" id="t-title" value="${esc(t.title || "")}" placeholder="z.B. umbauen Raum 2+3"></div>
+      <div class="frow">
+        <div class="field"><label>Datum</label><input type="date" class="ctl" id="t-date" value="${esc(t.date)}" min="${dates[0]}" max="${dates[6]}"></div>
+        <div class="field"><label>Raum</label><select class="ctl" id="t-room"><option value="">—</option>
+          ${rooms.map((r) => `<option value="${r.id}" ${r.id === t.room_id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Von</label><input type="time" class="ctl" id="t-start" value="${esc(t.start_time)}" step="900"></div>
+        <div class="field"><label>Bis</label><input type="time" class="ctl" id="t-end" value="${esc(t.end_time)}" step="900"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Personen</label><input type="number" class="ctl" id="t-staff" value="${t.staff_needed || 1}" min="1" max="10"></div>
+        <div class="field"><label>Rolle</label><select class="ctl" id="t-role"><option value="">—</option>
+          ${roles.map((r) => `<option ${r === t.role_required ? "selected" : ""}>${esc(r)}</option>`).join("")}</select></div>
+      </div>`;
+    crudSheet({
+      title: isNew ? "Neue Sonderaufgabe" : "Sonderaufgabe bearbeiten", isNew, body, table: "tasks", rec: t,
+      buildData: (dlg) => {
+        const g = (id) => dlg.querySelector(id);
+        const iso2 = DP.planner.isoWeekOf(parseISO(g("#t-date").value));
+        return {
+          location_id: S.locId, iso_year: iso2.year, iso_week: iso2.week, date: g("#t-date").value,
+          title: g("#t-title").value.trim() || null,
+          start_time: g("#t-start").value, end_time: g("#t-end").value,
+          room_id: g("#t-room").value ? +g("#t-room").value : null,
+          staff_needed: +g("#t-staff").value || 1, role_required: g("#t-role").value || null, note: null,
+        };
+      },
+    });
+  }
+
+  /* ------------------------------ MAILS -------------------------------- */
+  function availWeeks() {
+    const start = $("#av-start") ? $("#av-start").value : null;
+    const count = Math.max(1, Math.min(12, +($("#av-count") && $("#av-count").value) || 4));
+    const monday = mondayOf(start ? parseISO(start) : new Date());
+    const out = [];
+    for (let i = 0; i < count; i++) {
+      const m = new Date(monday); m.setDate(m.getDate() + i * 7);
+      const su = new Date(m); su.setDate(su.getDate() + 6);
+      const iso2 = DP.planner.isoWeekOf(m);
+      out.push({ year: iso2.year, week: iso2.week, monday: m, sunday: su });
+    }
+    return out;
+  }
+  const fmtDMY = (d) => `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  function periodLabel(weeks) {
+    const a = weeks[0], b = weeks[weeks.length - 1];
+    return `${weeks.length > 1 ? `KW ${a.week}–${b.week}` : `KW ${a.week}`}  (${fmtDMY(a.monday)}–${fmtDMY(b.sunday)})`;
+  }
+  function mailSubject(weeks) {
+    const a = weeks[0], b = weeks[weeks.length - 1];
+    return `${S.doc.settings.mail_subject || "Verfügbarkeit"} KW${a.week}${weeks.length > 1 ? "–" + b.week : ""}`;
+  }
+  function buildTemplate(weeks, name) {
+    // Pro Woche ein eigener Block: Mi in KW 30 heisst nicht Mi in KW 33.
+    const blocks = weeks.map((w) =>
+      `--- KW ${w.week} (${fmtDMY(w.monday).slice(0, 6)}–${fmtDMY(w.sunday)}) ---
+Mo:
+Di:
+Mi:
+Do:
+Fr:
+Sa:
+So:`).join("\n\n");
+    return `════════ VERFÜGBARKEIT ════════
+Betreff der Antwort-Mail: ${mailSubject(weeks)}
+Name: ${name || ""}
+Zeitraum: ${periodLabel(weeks)}
+
+Je Tag EIN Wort: ganz / vormittags / nachmittags / nicht
+Bitte JEDE Woche einzeln ausfüllen.
+
+${blocks}
+═══════════════════════════════`;
+  }
+  function normAvail(s) {
+    s = (s || "").trim().toLowerCase();
+    if (!s) return null;
+    if (/ganz|^ja$|voll|immer|^x$|^1$/.test(s)) return "yes";
+    if (/vorm|^vm$|^v$/.test(s)) return "vm";
+    if (/nachm|^nm$|^n$/.test(s)) return "nm";
+    if (/nicht|nein|kein|frei|^0$|^-$|^—$|gar/.test(s)) return "no";
+    return null;
+  }
+  function matchEmployee(name) {
+    const emps = S.doc.employees.filter((e) => e.active !== 0);
+    const n = name.toLowerCase().replace(/\s+/g, " ").trim();
+    let m = emps.find((e) => e.name.toLowerCase() === n)
+      || emps.find((e) => (e.kuerzel || "").toLowerCase() === n)
+      || emps.find((e) => e.name.toLowerCase().includes(n) || n.includes(e.name.toLowerCase()));
+    if (!m) { const toks = n.split(" ").filter((t) => t.length > 2); m = emps.find((e) => toks.some((t) => e.name.toLowerCase().includes(t))); }
+    return m || null;
+  }
+  const DAY_KEYS = [["mo", "montag"], ["di", "dienstag"], ["mi", "mittwoch"], ["do", "donnerstag"], ["fr", "freitag"], ["sa", "samstag"], ["so", "sonntag"]];
+
+  function parseDayLines(section) {
+    const weekdays = {}; const warnings = []; let filled = 0;
+    DAY_KEYS.forEach(([ab, full], i) => {
+      const re = new RegExp("^\\s*(?:" + ab + "|" + full + ")\\s*[:.=\\-]\\s*(.*)$", "im");
+      const m = section.match(re);
+      if (m) {
+        const v = normAvail(m[1]);
+        weekdays[i] = v;
+        if (v !== null) filled++;
+        if (m[1].trim() && v === null) warnings.push(`${WDS[i]}: "${m[1].trim()}" unklar`);
+      } else weekdays[i] = undefined;
+    });
+    return { weekdays, warnings, filled };
+  }
+
+  /** Pro Person: perWeek[kwNummer] = {0..6: mode}. Ohne KW-Abschnitte:
+      ein Muster fuer alle Wochen (mit Hinweis). */
+  function parseResponses(text, weeks) {
+    const blocks = text.split(/(?=^\s*name\s*:)/mi).map((b) => b.trim()).filter(Boolean);
+    return blocks.map((block) => {
+      const nameM = block.match(/name\s*:\s*(.+)/i);
+      const rawName = nameM ? nameM[1].trim() : "";
+      const warnings = [];
+      const perWeek = {};
+      let filled = 0;
+
+      // Abschnitte "KW <nr> ..." finden
+      const parts = block.split(/^[-–\s]*KW\s*(\d+)[^\n]*$/im);
+      // parts: [vorspann, kw1, text1, kw2, text2, ...]
+      if (parts.length > 1) {
+        for (let i = 1; i + 1 < parts.length + 1; i += 2) {
+          const kwNum = +parts[i];
+          const sec = parts[i + 1] || "";
+          const r = parseDayLines(sec);
+          perWeek[kwNum] = r.weekdays;
+          filled += r.filled;
+          r.warnings.forEach((w) => warnings.push(`KW${kwNum} ${w}`));
+          if (r.filled === 0) warnings.push(`KW${kwNum}: leer`);
+        }
+        for (const w of weeks) if (!perWeek[w.week]) warnings.push(`KW${w.week} fehlt in der Antwort`);
+      } else {
+        // Fallback: ein Muster fuer alle Wochen
+        const r = parseDayLines(block);
+        filled = r.filled;
+        warnings.push(...r.warnings);
+        if (r.filled > 0) {
+          warnings.push("Ein Muster für alle Wochen übernommen");
+          for (const w of weeks) perWeek[w.week] = r.weekdays;
+        }
+      }
+
+      if (!rawName) warnings.push("Kein Name erkannt");
+      const emp = rawName ? matchEmployee(rawName) : null;
+      if (rawName && !emp) warnings.push("Nicht zugeordnet");
+      return { rawName, emp, perWeek, warnings, filled };
+    }).filter((p) => p.rawName || p.filled > 0);
+  }
+  const AV_LABEL = { yes: "ganz", no: "nicht", vm: "vm", nm: "nm" };
+
+  function renderMails(scr) {
+    const nm = mondayOf(new Date()); nm.setDate(nm.getDate() + 7);
+    const canFetch = !!(globalThis.claude && globalThis.claude.mcp);
+    scr.innerHTML = `<div class="page">
+      <div><h1>Verfügbarkeit</h1>
+      <p class="muted">Mitarbeiter füllen die feste Vorlage aus. Antworten hier abrufen oder einfügen — die App liest sie selbst.</p></div>
+      <div class="card">
+        <div class="frow">
+          <div class="field"><label>Ab Montag</label><input type="date" class="ctl" id="av-start" value="${isoOf(nm)}"></div>
+          <div class="field"><label>Wochen</label><input type="number" class="ctl" id="av-count" value="4" min="1" max="12"></div>
+        </div>
+        <div class="muted mono" id="av-label"></div>
+      </div>
+      <div class="card">
+        <h2>1 · Vorlage verschicken</h2>
+        <div class="rowhead" style="flex-wrap:wrap;gap:8px">
+          <button class="btn btn--sm" data-a="gen">Vorlage erzeugen</button>
+          <button class="btn btn--sm" data-a="genper">Pro Mitarbeiter</button>
+          <button class="btn btn--sm btn--ghost" data-a="copytpl">${icon("copy")} Kopieren</button>
+        </div>
+        <textarea class="ctl" id="av-tpl" readonly placeholder="Hier erscheint die Vorlage …"></textarea>
+      </div>
+      <div class="card">
+        <h2>2 · Antworten auswerten</h2>
+        <button class="btn ${canFetch ? "btn--pri" : ""}" data-a="fetch" ${canFetch ? "" : "disabled"}>
+          ${icon("inbox")} Mails automatisch abrufen</button>
+        ${canFetch ? "" : '<p class="muted" style="font-size:13px">Automatischer Abruf ist aktiv, sobald die App als claude.ai-App mit Gmail-Zugriff läuft. Bis dahin: unten einfügen.</p>'}
+        <textarea class="ctl" id="av-paste" placeholder="Antworten hier einfügen (auch mehrere) …"></textarea>
+        <div class="rowhead"><button class="btn btn--pri" data-a="parse">Auswerten</button>
+          <button class="btn btn--sm btn--ghost" data-a="prompt">Claude/Gemini-Prompt</button></div>
+        <div id="av-preview"></div>
+      </div>
+    </div>`;
+
+    const updateLabel = () => { $("#av-label").textContent = periodLabel(availWeeks()) + " · Betreff: " + mailSubject(availWeeks()); };
+    updateLabel();
+    $("#av-start").addEventListener("input", updateLabel);
+    $("#av-count").addEventListener("input", updateLabel);
+
+    scr.onclick = (e) => {
+      if (e.target.closest("[data-apply]")) return applyAvailability();
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      const a = b.dataset.a;
+      if (a === "gen") $("#av-tpl").value = buildTemplate(availWeeks(), "");
+      else if (a === "genper") $("#av-tpl").value = locEmps().map((x) => buildTemplate(availWeeks(), x.name)).join("\n\n");
+      else if (a === "copytpl") {
+        const t = $("#av-tpl").value;
+        if (!t) toast("Erst Vorlage erzeugen", "info");
+        else copyText(t).then((ok) => { if (!ok) showTextSheet("Vorlage kopieren", "Alles markieren und kopieren, dann per Mail ans Team schicken:", t); });
+      }
+      else if (a === "prompt") showTextSheet(
+        "Prompt für Claude/Gemini",
+        "Nur nötig, wenn eine Antwort NICHT der Vorlage folgt (chaotische Mail): diesen Prompt zusammen mit der Mail in Claude oder Gemini einfügen — die KI formt sie in die Vorlage um, das Ergebnis unten bei „Antworten“ einfügen.",
+        `Du bekommst unten formlose E-Mails über Arbeits-Verfügbarkeit. Wandle JEDE in genau dieses Format um und antworte NUR mit den ausgefüllten Blöcken.\nErlaubte Werte je Tag: ganz / vormittags / nachmittags / nicht. Nicht genannte Tage: "ganz". Nicht genannte Wochen: Block weglassen.\n\n${buildTemplate(availWeeks(), "")}\n\nE-Mails:\n<hier die E-Mails einfügen>`);
+      else if (a === "parse") parseAndPreview();
+      else if (a === "fetch" && DP.gmail) DP.gmail.fetch();
+    };
+  }
+
+  function parseAndPreview(text) {
+    text = text || $("#av-paste").value.trim();
+    if (!text) return toast("Bitte Antworten einfügen", "info");
+    S.avail.weeks = availWeeks();
+    S.avail.parsed = parseResponses(text, S.avail.weeks);
+    if (!S.avail.parsed.length) return toast("Keine Vorlagen-Blöcke erkannt", "error");
+    const emps = S.doc.employees.filter((e) => e.active !== 0);
+
+    const rows = S.avail.parsed.map((p, idx) => {
+      const opts = '<option value="">—</option>' + emps.map((e) =>
+        `<option value="${e.id}" ${p.emp && e.id === p.emp.id ? "selected" : ""}>${esc(e.kuerzel)} · ${esc(e.name)}</option>`).join("");
+      const head = `<tr><td class="nm" colspan="8">
+        <div style="font-size:11px;color:var(--ink-faint)">gelesen: ${esc(p.rawName || "?")}</div>
+        <select class="ctl" style="min-height:38px;padding:4px 8px" data-map="${idx}">${opts}</select>
+        ${p.warnings.length ? `<div class="avwarn">${esc(p.warnings.join(" · "))}</div>` : ""}</td></tr>`;
+      const weekRows = S.avail.weeks.map((w) => {
+        const wd = p.perWeek[w.week];
+        const cells = [];
+        for (let i = 0; i < 7; i++) {
+          const v = wd ? wd[i] : undefined;
+          cells.push(`<td>${v ? `<span class="avcell av-${v === "nm" ? "nm2" : v}">${AV_LABEL[v]}</span>` : '<span class="avwarn">—</span>'}</td>`);
+        }
+        return `<tr><td class="mono" style="font-size:12px">KW${w.week}</td>${cells.join("")}</tr>`;
+      }).join("");
+      return head + weekRows;
+    }).join("");
+
+    $("#av-preview").innerHTML = `<div class="scrollx"><table class="avtable">
+      <thead><tr><th></th>${WDS.map((d) => `<th>${d}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div>
+      <button class="btn btn--pri btn--block" style="margin-top:10px" data-apply>
+        Übernehmen (${S.avail.weeks.length} Wochen)</button>`;
+  }
+
+  function applyAvailability() {
+    let entries = 0, people = 0;
+    document.querySelectorAll("#av-preview [data-map]").forEach((sel) => {
+      const empId = sel.value ? +sel.value : null;
+      if (!empId) return;
+      const p = S.avail.parsed[+sel.dataset.map];
+      let any = false;
+      S.avail.weeks.forEach((w) => {
+        const wd = p.perWeek[w.week];
+        if (!wd) return; // Woche fehlte in der Antwort -> nichts ueberschreiben
+        for (let i = 0; i < 7; i++) {
+          const mode = wd[i];
+          if (mode === null || mode === undefined) continue;
+          S.doc.week_availability = S.doc.week_availability.filter(
+            (r) => !(r.employee_id === empId && r.iso_year === w.year && r.iso_week === w.week && r.weekday === i));
+          DP.model.insert(S.doc, "week_availability", { employee_id: empId, iso_year: w.year, iso_week: w.week, weekday: i, mode, note: null });
+          entries++; any = true;
+        }
+      });
+      if (any) people++;
+    });
+    if (!entries) return toast("Nichts zu übernehmen", "error");
+    DP.storage.markDirty();
+    toast(`Übernommen: ${people} Person(en) · ${entries} Einträge`, "success");
+  }
+  DP.ui = { parseAndPreview, toast, render: () => render() };
+
+  /* ------------------------------ TEAM --------------------------------- */
+  function renderTeam(scr) {
+    const sections = S.doc.locations.map((l) => {
+      const team = S.doc.employees.filter((e) => e.location_id === l.id && e.active !== 0)
+        .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+      const rows = team.map((e) => `
+        <button class="item" data-emp="${e.id}" style="--c:${esc(e.color)}"><span class="bar"></span>
+          <span class="bd"><span class="ti">${esc(e.name)} <span class="mono" style="color:var(--ink-faint);font-size:12px">${esc(e.kuerzel)}</span></span>
+          <span class="mt">${esc(e.employment_type || "")} · ${e.weekly_hours || 0} h${e.can_home_office ? " · Home" : ""}${e.can_open_close ? " · schließt" : ""}</span></span>
+        </button>`).join("") || '<div class="empty">Noch kein Team.</div>';
+      return `<section><div class="rowhead">
+        <i class="dot" style="background:${esc(l.color)}"></i><h2>${esc(l.name)}</h2>
+        <span class="muted">(${team.length})</span><span class="sp"></span>
+        <button class="btn btn--sm btn--ghost" data-editloc="${l.id}">⚙</button>
+        <button class="btn btn--sm" data-addemp="${l.id}">+ MA</button></div>
+        <div class="list">${rows}</div></section>`;
+    }).join("");
+    scr.innerHTML = `<div class="page">
+      <div><h1>Team & Standorte</h1>
+      <p class="muted"><b>Fundament:</b> Jede Person ist fest einem Standort zugeordnet und wird nur dort verplant. Zuordnung im Personen-Editor änderbar.</p></div>
+      ${sections}
+      <button class="btn" data-addloc>+ Standort anlegen</button></div>`;
+    scr.onclick = (e) => {
+      const emp = e.target.closest("[data-emp]");
+      const addE = e.target.closest("[data-addemp]");
+      const edL = e.target.closest("[data-editloc]");
+      const addL = e.target.closest("[data-addloc]");
+      if (emp) employeeSheet(empById(+emp.dataset.emp));
+      else if (addE) employeeSheet(null, +addE.dataset.addemp);
+      else if (edL) locationSheet(S.doc.locations.find((l) => l.id === +edL.dataset.editloc));
+      else if (addL) locationSheet(null);
+    };
+  }
+
+  function employeeSheet(emp, presetLoc) {
+    const isNew = !emp;
+    const types = S.doc.settings.employment_types || ["Vollzeit"];
+    const roles = S.doc.settings.roles || [];
+    emp = emp || {
+      location_id: presetLoc || S.locId, employment_type: types[0], weekly_hours: 40,
+      color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+      availability: {}, school: [], roles: [], nogo: [],
+      can_work_alone: 1, can_open_close: 0, can_home_office: 0, max_hours_day: 10,
+    };
+    const schoolMap = {}; (emp.school || []).forEach((s) => (schoolMap[s.weekday] = s.period));
+    const av = emp.availability || {};
+    const wdAvail = WDS.map((d, i) => `<div class="c"><small>${d}</small><select data-avl="${i}">
+      ${[["yes", "Ja"], ["no", "—"], ["vm", "vm"], ["nm", "nm"]].map(([v, l]) => `<option value="${v}" ${(av[i] || "yes") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>`).join("");
+    const wdSchool = WDS.map((d, i) => `<div class="c"><small>${d}</small><select data-sch="${i}">
+      ${[["", "—"], ["vm", "vm"], ["nm", "nm"], ["ganztags", "ganz"]].map(([v, l]) => `<option value="${v}" ${(schoolMap[i] || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>`).join("");
+
+    const body = `
+      <div class="frow">
+        <div class="field"><label>Name</label><input class="ctl" id="e-name" value="${esc(emp.name || "")}"></div>
+        <div class="field"><label>Kürzel</label><input class="ctl mono" id="e-kz" value="${esc(emp.kuerzel || "")}" maxlength="4"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Standort (fest)</label><select class="ctl" id="e-loc">
+          ${S.doc.locations.map((l) => `<option value="${l.id}" ${l.id === emp.location_id ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Farbe</label><input type="color" class="ctl" id="e-color" value="${esc(emp.color)}"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Beschäftigung</label><select class="ctl" id="e-type">
+          ${types.map((t) => `<option ${t === emp.employment_type ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+        <div class="field"><label>Wochenstunden</label><input type="number" class="ctl" id="e-hours" value="${emp.weekly_hours || 40}" min="0" max="60" step="0.5"></div>
+      </div>
+      <div class="field"><label>Standard-Verfügbarkeit</label><div class="wdgrid">${wdAvail}</div></div>
+      <div class="field"><label>Berufsschule</label><div class="wdgrid">${wdSchool}</div></div>
+      <div class="field"><label>Rollen</label><div class="chips">
+        ${roles.map((r) => `<label class="chip"><input type="checkbox" data-role value="${esc(r)}" ${(emp.roles || []).includes(r) ? "checked" : ""}>${esc(r)}</label>`).join("")}</div></div>
+      <label class="check"><input type="checkbox" id="e-open" ${emp.can_open_close ? "checked" : ""}> Darf auf-/zuschließen</label>
+      <label class="check"><input type="checkbox" id="e-alone" ${emp.can_work_alone ? "checked" : ""}> Darf allein arbeiten</label>
+      <label class="check"><input type="checkbox" id="e-home" ${emp.can_home_office ? "checked" : ""}> Darf Homeoffice</label>
+      <div class="frow">
+        <div class="field"><label>Max Std/Tag</label><input type="number" class="ctl" id="e-maxd" value="${emp.max_hours_day || 10}" min="1" max="24"></div>
+        <div class="field"><label>Max Std/Woche</label><input type="number" class="ctl" id="e-maxw" value="${emp.max_hours_week || ""}" placeholder="auto"></div>
+      </div>`;
+    crudSheet({
+      title: isNew ? "Neuer Mitarbeiter" : emp.name, isNew, body, table: "employees", rec: emp,
+      buildData: (dlg) => {
+        const g = (id) => dlg.querySelector(id);
+        if (!g("#e-name").value.trim()) { toast("Name fehlt", "error"); return null; }
+        const availability = {};
+        dlg.querySelectorAll("[data-avl]").forEach((s) => (availability[s.dataset.avl] = s.value));
+        const school = [];
+        dlg.querySelectorAll("[data-sch]").forEach((s) => { if (s.value) school.push({ weekday: +s.dataset.sch, period: s.value }); });
+        return {
+          name: g("#e-name").value.trim(), kuerzel: g("#e-kz").value.trim(),
+          location_id: +g("#e-loc").value, color: g("#e-color").value,
+          employment_type: g("#e-type").value, weekly_hours: +g("#e-hours").value,
+          availability, school, roles: [...dlg.querySelectorAll("[data-role]:checked")].map((c) => c.value),
+          nogo: emp.nogo || [],
+          can_open_close: g("#e-open").checked ? 1 : 0, can_work_alone: g("#e-alone").checked ? 1 : 0,
+          can_home_office: g("#e-home").checked ? 1 : 0,
+          max_hours_day: +g("#e-maxd").value || 10, max_hours_week: g("#e-maxw").value ? +g("#e-maxw").value : null,
+          min_rest_hours: emp.min_rest_hours || 11, max_consecutive_days: emp.max_consecutive_days || 6,
+          earliest_start: emp.earliest_start || null, latest_end: emp.latest_end || null,
+          preferences: emp.preferences || null, secondary_locations: null, vacation_days_total: null,
+          contract_start: null, contract_end: null, note: emp.note || null, active: 1, sort: emp.sort || 0,
+        };
+      },
+    });
+  }
+
+  function locationSheet(l) {
+    const isNew = !l;
+    l = l || { color: "#2F5D8A", bundesland: "BW", open_on_holidays: 1 };
+    const BL = Object.keys(DP.holidays.BUNDESLAENDER);
+    const body = `
+      <div class="frow">
+        <div class="field"><label>Name</label><input class="ctl" id="l-name" value="${esc(l.name || "")}"></div>
+        <div class="field"><label>Kürzel</label><input class="ctl mono" id="l-kz" value="${esc(l.kuerzel || "")}" maxlength="4"></div>
+      </div>
+      <div class="frow">
+        <div class="field"><label>Bundesland</label><select class="ctl" id="l-bl">
+          ${BL.map((b) => `<option ${b === l.bundesland ? "selected" : ""}>${b}</option>`).join("")}</select></div>
+        <div class="field"><label>Farbe</label><input type="color" class="ctl" id="l-color" value="${esc(l.color)}"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="l-hol" ${l.open_on_holidays ? "checked" : ""}> An Feiertagen grundsätzlich geöffnet</label>
+      ${isNew ? '<p class="muted" style="font-size:13px">Betriebszeiten Mo–Fr 08–18, 2 Räume und Grundbesetzung werden angelegt (später änderbar).</p>' : ""}`;
+    const foot = `${isNew ? "" : '<button class="btn btn--danger" data-del>Löschen</button>'}
+      <span class="sp"></span><button class="btn" data-x>Abbrechen</button>
+      <button class="btn btn--pri" data-save>Speichern</button>`;
+    const { dlg, close } = sheet({ title: isNew ? "Neuer Standort" : l.name, body, foot });
+    dlg.querySelector("[data-save]").addEventListener("click", () => {
+      const g = (id) => dlg.querySelector(id);
+      if (!g("#l-name").value.trim()) return toast("Name fehlt", "error");
+      const data = {
+        name: g("#l-name").value.trim(), kuerzel: g("#l-kz").value.trim(),
+        bundesland: g("#l-bl").value, color: g("#l-color").value,
+        open_on_holidays: g("#l-hol").checked ? 1 : 0,
+      };
+      if (isNew) {
+        const rec = DP.model.insert(S.doc, "locations", Object.assign({ note: null, active: 1, sort: S.doc.locations.length }, data));
+        for (let wd = 0; wd < 7; wd++) {
+          const closed = wd > 4;
+          DP.model.insert(S.doc, "operating_hours", { location_id: rec.id, weekday: wd, open_time: closed ? null : "08:00", close_time: closed ? null : "18:00", closed: closed ? 1 : 0 });
+          if (!closed) {
+            DP.model.insert(S.doc, "coverage_blocks", { location_id: rec.id, weekday: wd, start_time: "08:00", end_time: "14:00", min_staff: 2, role_required: null, note: null });
+            DP.model.insert(S.doc, "coverage_blocks", { location_id: rec.id, weekday: wd, start_time: "14:00", end_time: "18:00", min_staff: 1, role_required: null, note: null });
+          }
+        }
+        for (let r = 1; r <= 2; r++) DP.model.insert(S.doc, "rooms", { location_id: rec.id, name: "Raum " + r, sort: r });
+      } else DP.model.update(S.doc, "locations", l.id, data);
+      DP.storage.markDirty(); close(); render(); toast("Standort gespeichert", "success");
+    });
+    const del = dlg.querySelector("[data-del]");
+    if (del) del.addEventListener("click", () => {
+      const team = S.doc.employees.filter((e) => e.location_id === l.id && e.active !== 0);
+      if (team.length) return toast(`Erst ${team.length} Mitarbeiter umziehen/löschen`, "error");
+      DP.model.remove(S.doc, "locations", l.id);
+      if (S.locId === l.id) S.locId = S.doc.locations[0] && S.doc.locations[0].id;
+      DP.storage.markDirty(); close(); render(); toast("Standort gelöscht", "success");
+    });
+  }
+
+  /* ------------------------------ EXPORT ------------------------------- */
+  function renderExport(scr) {
+    const { year, week } = wk();
+    const l = loc();
+    const st = DP.storage.state;
+    scr.innerHTML = `<div class="page">
+      <div><h1>Export & Daten</h1>
+      <p class="muted">Exportiert wird <b>${esc(l.name)}</b>, KW ${week}. Woche im Plan-Tab wechseln.</p></div>
+      <div class="card"><h2>Excel</h2>
+        <p class="muted">Aushang (farbiges Wochenraster) + Stundenabrechnung in einer Datei — per Teilen an Gmail schicken, am PC drucken.</p>
+        <div class="rowhead" style="flex-wrap:wrap;gap:8px">
+          <button class="btn btn--pri" data-a="xlsx">${icon("out")} Excel erstellen</button>
+          ${DP.drive && DP.drive.enabled ? '<button class="btn" data-a="xlsxdrive">→ In Google Drive</button>' : ""}</div></div>
+      <div class="card"><h2>Google Kalender (.ics)</h2>
+        <p class="muted">Titel wie gewohnt („NA 08:00 bis 17:00"). Pro Person = feste Farbe im Kalender.</p>
+        <div class="rowhead" style="flex-wrap:wrap;gap:8px">
+          <button class="btn" data-a="ics">Alle in einer Datei</button>
+          <select class="ctl" id="x-emp" style="flex:1;min-width:130px">
+            ${locEmps().map((e) => `<option value="${e.id}">${esc(e.kuerzel)} · ${esc(e.name)}</option>`).join("")}</select>
+          <button class="btn" data-a="icsper">Nur diese Person</button>
+          ${DP.drive && DP.drive.enabled ? '<button class="btn" data-a="icsdrive">→ In Google Drive</button>' : ""}</div></div>
+      <div class="card"><h2>Datensicherung</h2>
+        <p class="muted">Speicher: ${st.driveEnabled ? "Google Drive (" + esc(st.driveStatus) + ") + Gerät" : "auf diesem Gerät"} ·
+          ${st.lastSavedAt ? "zuletzt gesichert " + st.lastSavedAt.toLocaleTimeString("de-DE").slice(0, 5) : "noch nicht extern gesichert"}</p>
+        <div class="rowhead" style="flex-wrap:wrap;gap:8px">
+          <button class="btn" data-a="backup">Backup-Datei</button>
+          <button class="btn" data-a="restore">Backup laden</button>
+          <button class="btn btn--danger btn--sm" data-a="demo">Demo zurücksetzen</button></div>
+        <input type="file" id="x-file" accept=".json" style="display:none"></div>
+    </div>`;
+
+    scr.onclick = async (e) => {
+      const b = e.target.closest("[data-a]"); if (!b) return;
+      const a = b.dataset.a;
+      try {
+        if (a === "xlsx") {
+          const r = await DP.excel.exportExcel(S.doc, S.locId, year, week);
+          await saveFile(r.filename, r.buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        } else if (a === "xlsxdrive") {
+          const r = await DP.excel.exportExcel(S.doc, S.locId, year, week);
+          await DP.drive.upload(r.filename, r.buffer, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+          toast("In Google Drive gespeichert: " + r.filename, "success");
+        } else if (a === "icsdrive") {
+          const r = DP.ics.exportCombined(S.doc, S.locId, year, week);
+          await DP.drive.upload(r.filename, r.content, "text/calendar");
+          toast("In Google Drive gespeichert: " + r.filename, "success");
+        } else if (a === "ics") {
+          const r = DP.ics.exportCombined(S.doc, S.locId, year, week);
+          await saveFile(r.filename, r.content, "text/calendar");
+        } else if (a === "icsper") {
+          const empId = +$("#x-emp").value;
+          const all = DP.ics.exportPerPerson(S.doc, S.locId, year, week);
+          const one = all.find((p) => p.employee_id === empId);
+          if (!one) return toast("Keine Termine für diese Person in KW " + week, "info");
+          await saveFile(one.filename, one.content, "text/calendar");
+        } else if (a === "backup") {
+          const r = DP.storage.exportJSON();
+          await saveFile(r.filename, r.content, "application/json");
+        } else if (a === "restore") {
+          const inp = $("#x-file");
+          inp.onchange = async () => {
+            const f = inp.files[0]; if (!f) return;
+            try { DP.storage.importJSON(await f.text()); S.doc = DP.storage.state.doc; render(); toast("Backup geladen", "success"); }
+            catch (err) { toast("Datei ungültig: " + err.message, "error"); }
+          };
+          inp.click();
+        } else if (a === "demo") {
+          if (confirm("Wirklich alle Daten durch die Demo ersetzen?")) {
+            S.doc = DP.storage.resetDemo(); S.locId = S.doc.locations[0].id; render(); toast("Demo geladen", "success");
+          }
+        }
+      } catch (err) { toast("Fehler: " + err.message, "error"); }
+    };
+  }
+
+  /* ------------------------------ Boot --------------------------------- */
+  function bootError(msg) {
+    const app = document.getElementById("app");
+    if (app && !app.querySelector(".screen, .tabs")) {
+      app.innerHTML = `<div style="padding:24px;font-family:system-ui;max-width:60ch">
+        <h2 style="margin-bottom:8px">Dienstplaner konnte nicht starten</h2>
+        <p style="opacity:.8">Bitte diese Meldung an den Support (Claude-Chat) weitergeben:</p>
+        <pre style="white-space:pre-wrap;background:rgba(128,128,128,.15);padding:10px;border-radius:8px;margin-top:8px">Phase: ${bootPhase}
+${String(msg).slice(0, 1200)}</pre>
+        <button onclick="location.reload()" style="margin-top:12px;padding:10px 16px;border-radius:8px">Neu laden</button>
+      </div>`;
+    }
+  }
+  window.addEventListener("error", (e) => bootError((e.error && e.error.stack) || e.message + (e.filename ? "\n" + e.filename + ":" + e.lineno : "")));
+  window.addEventListener("unhandledrejection", (e) => bootError((e.reason && (e.reason.stack || e.reason.message)) || String(e.reason)));
+
+  let bootPhase = "start";
+  async function boot() {
+    try { const t = localStorage.getItem("dp-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+    if (!document.documentElement.dataset.theme) document.documentElement.dataset.theme = "dark";
+    bootPhase = "storage";
+    S.doc = await DP.storage.init();
+    // Selbstheilung: unbrauchbarer Datenbestand -> frische Demo statt Absturz
+    if (!S.doc || !Array.isArray(S.doc.locations) || !S.doc.locations.length) {
+      S.doc = DP.storage.resetDemo();
+    }
+    bootPhase = "render";
+    S.locId = S.doc.locations[0] && S.doc.locations[0].id;
+    S.day = (new Date().getDay() + 6) % 7;
+    const mq = window.matchMedia("(min-width: 700px)");
+    const onModeChange = () => render();
+    if (mq.addEventListener) mq.addEventListener("change", onModeChange);
+    else mq.addListener(onModeChange);
+    window.addEventListener("orientationchange", () => setTimeout(render, 150));
+    render();
+  }
+  boot().catch((e) => bootError(e && e.message ? e.message : String(e)));
+})();
+
+/* Artifact-Glue: verbindet die App mit window.claude.mcp (Gmail + Google Drive)
+   und window.claude.downloads. Ohne diese Umgebung (lokal/PWA) bleibt alles inert.
+
+   Beobachtete Tool-Formen (echte Request/Response-Paare, Juli 2026):
+     Gmail  search_threads({query,pageSize}) -> {threads:[{id,messages:[{subject,sender,snippet,date,...}]}]} | {}
+     Gmail  get_thread({threadId,messageFormat:"FULL_CONTENT"}) -> {messages:[{plaintextBody,htmlBody,subject,...}]}
+     Drive  search_files({query,pageSize}) -> {files:[{id,title,createdTime,...}]} | {}
+     Drive  create_file({title,textContent|base64Content,contentMimeType,disableConversionToGoogleType:true}) -> {id,title,...}
+     Drive  download_file_content({fileId}) -> {content:<base64>,mimeType,title}
+   Fehlerbehandlung nach mcp.d.ts: pro Code eigener Hinweis, Retry nur bei retryable. */
+(function () {
+  const DP = (globalThis.DP = globalThis.DP || {});
+  if (typeof window === "undefined") return;
+
+  const GMAIL = "Gmail";
+  const DRIVE = "Google Drive";
+
+  /* ------------------------- base64 <-> utf8/bytes -------------------- */
+  function b64ToUtf8(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder("utf-8").decode(bytes);
+  }
+  function bytesToB64(bytes) {
+    let bin = "";
+    const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+  const utf8ToB64 = (s) => bytesToB64(new TextEncoder().encode(s));
+
+  /* ------------------------- Fehler-Hinweise --------------------------- */
+  function errHint(e, server) {
+    const s = (e && e.server) || server || "Konnektor";
+    switch (e && e.code) {
+      case "needs_reauth": return `${s} neu verbinden: claude.ai → Einstellungen → Konnektoren`;
+      case "server_not_connected": return `${s} fehlt: in claude.ai → Einstellungen → Konnektoren hinzufügen`;
+      case "selection_required": return `Mehrere ${s}-Konnektoren – bitte in der Abfrage oben einen auswählen`;
+      case "server_unavailable": return `${s} gerade nicht erreichbar – später erneut versuchen`;
+      case "not_in_manifest": return `${s}: Zugriff nicht freigegeben (Manifest)`;
+      case "blocked_by_policy": case "approval_required": return `${s}: durch Richtlinie blockiert`;
+      case "tool_error": return `${s}-Fehler: ${e.message || "Tool meldete einen Fehler"}`;
+      case "not_granted": case "capability_disabled": case "capability_removed":
+        return "Konnektor-Zugriff in dieser Ansicht nicht verfügbar";
+      default: return `${s}: ${e && e.message ? e.message : "unbekannter Fehler"}`;
+    }
+  }
+
+  async function call(server, tool, input, opts) {
+    const mcp = window.claude && window.claude.mcp;
+    if (!mcp) throw { code: "capability_disabled", message: "kein mcp" };
+    return mcp.callTool(server, tool, input, opts);
+  }
+  const payload = (r) => (r && r.payload !== undefined ? r.payload : null);
+
+  /* ------------------------- Drive-Adapter ----------------------------- */
+  const driveAdapter = {
+    async listNewest() {
+      const r = await call(DRIVE, "search_files", {
+        query: `title contains '${DP.storage.FILE_PREFIX}'`, pageSize: 25,
+      }, { cache: false });
+      const files = (payload(r) || {}).files || [];
+      const state = files
+        .filter((f) => (f.title || "").startsWith(DP.storage.FILE_PREFIX) && (f.title || "").endsWith(".json"))
+        .sort((a, b) => (b.title || "").localeCompare(a.title || ""));
+      if (!state.length) return null;
+      const dl = await call(DRIVE, "download_file_content", { fileId: state[0].id }, { cache: false });
+      const p = payload(dl) || {};
+      return { name: state[0].title, content: p.content ? b64ToUtf8(p.content) : null };
+    },
+    async save(name, content) {
+      await call(DRIVE, "create_file", {
+        title: name, textContent: content,
+        contentMimeType: "application/json", disableConversionToGoogleType: true,
+      });
+    },
+  };
+
+  /* Beliebige Export-Datei nach Drive (auch binaer, z.B. .xlsx). */
+  async function uploadToDrive(filename, data, mime) {
+    const input = { title: filename, contentMimeType: mime, disableConversionToGoogleType: true };
+    if (data instanceof Uint8Array) input.base64Content = bytesToB64(data);
+    else input.base64Content = utf8ToB64(String(data));
+    const r = await call(DRIVE, "create_file", input);
+    return payload(r);
+  }
+
+  /* ------------------------- Gmail-Abruf ------------------------------- */
+  async function fetchAvailabilityMails() {
+    const ui = DP.ui;
+    const subject = (DP.storage.state.doc.settings.mail_subject || "Verfügbarkeit").split(" ")[0];
+    ui.toast("Suche Mails mit Betreff „" + subject + "“ …");
+    let threads;
+    try {
+      const r = await call(GMAIL, "search_threads", {
+        query: `subject:${subject} newer_than:90d`, pageSize: 30,
+      }, { cache: false });
+      threads = (payload(r) || {}).threads || [];
+    } catch (e) { ui.toast(errHint(e, GMAIL), "error"); return; }
+    if (!threads.length) { ui.toast("Keine Mails mit diesem Betreff gefunden (letzte 90 Tage)", "info"); return; }
+
+    ui.toast(`${threads.length} Mail(s) gefunden – lese Inhalte …`);
+    const texts = [];
+    for (const t of threads) {
+      try {
+        const r = await call(GMAIL, "get_thread", { threadId: t.id, messageFormat: "FULL_CONTENT" }, { cache: false });
+        const msgs = (payload(r) || {}).messages || [];
+        for (const m of msgs) {
+          const body = m.plaintextBody || m.plaintext_body || m.snippet || "";
+          if (/name\s*:/i.test(body)) texts.push(body);
+        }
+      } catch (e) { /* einzelne Mail fehlerhaft -> Rest weiterlesen */ }
+    }
+    if (!texts.length) { ui.toast("Mails gefunden, aber keine ausgefüllte Vorlage darin", "info"); return; }
+    const ta = document.querySelector("#av-paste");
+    if (ta) ta.value = texts.join("\n\n");
+    ui.parseAndPreview(texts.join("\n\n"));
+    ui.toast(`${texts.length} Antwort-Block/Blöcke eingelesen – bitte prüfen und übernehmen`, "success");
+  }
+
+  /* ------------------------- Aktivierung ------------------------------- */
+  async function activate() {
+    const mcp = window.claude && window.claude.mcp;
+    if (!mcp) return; // lokal / PWA
+    // Warten, bis die Oberflaeche gebaut ist (Wettlauf beim Start vermeiden)
+    for (let i = 0; i < 80 && !document.querySelector(".tabs"); i++)
+      await new Promise((r) => setTimeout(r, 125));
+    let servers = [];
+    try { servers = ((await mcp.listTools()) || {}).servers || []; }
+    catch (e) { DP.ui && DP.ui.toast(errHint(e), "error"); return; }
+
+    const names = servers.map((s) => s.server);
+    const hasTool = (name, tool) => {
+      const s = servers.find((x) => x.server === name);
+      return !!(s && s.tools && s.tools.some((t) => t.name === tool));
+    };
+
+    const gmailOk = hasTool(GMAIL, "search_threads");
+    const driveOk = hasTool(DRIVE, "search_files") && hasTool(DRIVE, "create_file");
+
+    if (driveOk) {
+      DP.storage.setDriveAdapter(driveAdapter);
+      // Neuesten Drive-Stand laden und uebernehmen, wenn vorhanden
+      try {
+        const newest = await driveAdapter.listNewest();
+        if (newest && newest.content) {
+          DP.storage.importJSON(newest.content);
+          DP.ui && DP.ui.toast("Stand aus Google Drive geladen (" + newest.name + ")", "success");
+          DP.ui && DP.ui.render();
+        }
+      } catch (e) { DP.ui && DP.ui.toast(errHint(e, DRIVE), "error"); }
+    }
+    if (gmailOk) DP.gmail = { fetch: fetchAvailabilityMails };
+    DP.drive = { enabled: driveOk, upload: uploadToDrive };
+
+    if (!gmailOk || !driveOk) {
+      const missing = [!gmailOk && GMAIL, !driveOk && DRIVE].filter(Boolean).join(" + ");
+      DP.ui && DP.ui.toast(`Hinweis: ${missing} nicht verbunden (claude.ai → Einstellungen → Konnektoren). Verbunden: ${names.join(", ") || "keine"}`, "info");
+    }
+    DP.ui && DP.ui.render();
+  }
+
+  DP.artifact = { activate, uploadToDrive, errHint };
+  // Nach dem UI-Boot aktivieren; Fehler hier duerfen den Start nie verhindern
+  setTimeout(() => { activate().catch(() => {}); }, 400);
+})();
+
+</script>
+</body>
+</html>
