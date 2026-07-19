@@ -1,82 +1,84 @@
-# Übergabe an Myriam — Weg A (Veröffentlichen aus ihrem Konto)
+# Übergabe an Myriam — GitHub-Weg
 
-Ziel: Ein Artifact, das **ihrem** Claude-Konto gehört und deshalb auf **ihre**
-Gmail- und Drive-Konnektoren zugreifen darf. Dauert ca. 5 Minuten.
+Code liegt öffentlich auf GitHub: **https://github.com/blashyrkh138/dienstplaner**
 
-## Vorher (macht Myriam selbst, an ihrem eigenen Gerät)
+Es gibt zwei Nutzungsstufen. Stufe 1 funktioniert **sofort**, Stufe 2 schaltet
+die volle Automatik frei.
 
-Auf **claude.ai** anmelden → unten links Name → **Einstellungen** →
-**Konnektoren** → **Gmail** und **Google Drive** verbinden.
-(Gmail = das Postfach mit den Verfügbarkeits-Mails, Drive = ihre Datenablage.)
+---
 
-## Die 5 Minuten (an Aarons Rechner, Myriam ist dabei)
+## Stufe 1 — Sofort nutzbar (GitHub Pages, ohne Login, ohne Einrichtung)
 
-1. **Terminal öffnen** und in den Projektordner wechseln:
+**App-Adresse:** https://blashyrkh138.github.io/dienstplaner/
+
+Diese URL läuft auf jedem Gerät (Handy, Laptop, Büro-PC). Am Pixel in Chrome
+öffnen → Menü (⋮) → **„Zum Startbildschirm hinzufügen"** → App-Icon fertig.
+
+Kann alles: Planen, Auto-Plan, Team, Kurse, Excel-/Kalender-Export,
+Verfügbarkeiten per **Einfügen**. Grenzen dieser Stufe:
+- **Keine Geräte-Synchronisierung über Drive** — Daten liegen pro Gerät im
+  Browser. Für den Wechsel Handy ↔ PC: im Tab „Export“ **Backup-Datei** in
+  Google Drive ablegen und am anderen Gerät **Backup laden**.
+- **Kein automatischer Mail-Abruf** — Antworten der Mitarbeiter ins Feld einfügen.
+
+Diese Stufe ist gut zum sofortigen Ausprobieren und für einen einzelnen
+Hauptrechner völlig ausreichend.
+
+---
+
+## Stufe 2 — Volle Automatik (Artifact mit Gmail + Drive)
+
+Dafür wird die App unter **Myriams eigenem Claude-Konto** als Artifact
+veröffentlicht — nur so darf sie auf Myriams Gmail und Drive zugreifen (dann:
+Mails per Knopf abrufen + automatische, geräteübergreifende Drive-Speicherung).
+
+### a) Konnektoren verbinden (Myriam, einmalig)
+claude.ai → Name unten links → **Einstellungen → Konnektoren** →
+**Gmail** und **Google Drive** verbinden.
+
+### b) Repository in ihren Account holen
+1. Myriam braucht ein (kostenloses) **GitHub-Konto**.
+2. https://github.com/blashyrkh138/dienstplaner öffnen → oben rechts **Fork**
+   → jetzt liegt eine Kopie unter `github.com/<myriam>/dienstplaner`.
+
+### c) Artifact veröffentlichen (in claude.ai/code)
+1. **claude.ai/code** öffnen (mit Myriams Claude-Konto) → GitHub verbinden →
+   ihren Fork `dienstplaner` auswählen.
+2. Diesen Text schicken:
+
    ```
-   cd "C:\Users\Rohleder\Downloads\CLAUDE-AR\Personalplanung"
-   ```
-
-2. **Claude Code starten:**
-   ```
-   claude
-   ```
-
-3. **Konto wechseln:** im laufenden Claude-Fenster eingeben:
-   ```
-   /login
-   ```
-   → Der Browser öffnet sich. **Myriam meldet sich hier selbst an** (Aaron
-   sieht das Passwort nicht). Danach läuft die Sitzung unter ihrem Konto.
-
-4. **Diesen Text einfügen und abschicken:**
-
-   ```
-   Bitte veröffentliche die Datei
-   app-mobile/dist/dienstplaner-artifact.html
-   unverändert als privates Artifact.
-
-   Nutze das Artifact-Werkzeug mit genau diesen Angaben:
+   Veröffentliche app-mobile/dist/dienstplaner-artifact.html unverändert als
+   privates Artifact. Nutze das Artifact-Werkzeug mit:
    - file_path: app-mobile/dist/dienstplaner-artifact.html
-   - favicon: ⚓
-   - title: Dienstplaner
+   - favicon: ⚓  · title: Dienstplaner
    - description: Personalplanung für Fortbildungszentren
-   - capabilities:
-     {"mcp": {"servers": [
-        {"server": "Gmail", "tools": ["search_threads", "get_thread"]},
-        {"server": "Google Drive", "tools": ["search_files", "create_file", "download_file_content"]}
-      ]},
-      "downloads": true}
-
-   Gib mir danach die URL aus.
+   - capabilities: {"mcp": {"servers": [
+       {"server":"Gmail","tools":["search_threads","get_thread"]},
+       {"server":"Google Drive","tools":["search_files","create_file","download_file_content"]}
+     ]}, "downloads": true}
+   Gib mir danach die URL.
    ```
+3. Die ausgegebene `claude.ai/code/artifact/…`-URL öffnen (mit ihrer Anmeldung),
+   beim ersten Zugriff **Erlauben**, dann am Pixel zum Startbildschirm hinzufügen.
 
-5. **URL prüfen:** Die ausgegebene Adresse (`https://claude.ai/code/artifact/…`)
-   im Browser öffnen — noch mit Myriams Anmeldung. Die App muss starten und
-   oben rechts sollten die Standorte auftauchen. Beim ersten Konnektor-Zugriff
-   einmal **Erlauben** klicken.
+---
 
-6. **Zurück wechseln:** in Claude Code `/login` und Aarons Konto wählen.
-   URL an Myriam schicken → sie fügt sie am Pixel zum Startbildschirm hinzu.
+## Später etwas ändern (bleibt für immer möglich)
 
-## Später etwas ändern
+1. Änderung im Code umsetzen (lokal oder per Claude), dann:
+   ```
+   cd app-mobile && node build.mjs
+   cd .. && git add -A && git commit -m "…" && git push
+   ```
+2. **GitHub Pages aktualisiert sich automatisch** (Stufe 1) — nach ~1 Minute
+   ist die Änderung unter der Pages-URL live.
+3. Für Stufe 2: das Artifact erneut veröffentlichen — dabei **die bestehende
+   Artifact-URL mitgeben**, dann bleibt Myriams Link gleich.
 
-Änderungswunsch in Claude Code umsetzen, `node app-mobile/build.mjs` laufen
-lassen und dieselbe Datei erneut veröffentlichen — dabei **die bestehende URL
-mitgeben**, dann bleibt Myriams Link unverändert:
-
-```
-Veröffentliche app-mobile/dist/dienstplaner-artifact.html erneut unter der
-bestehenden URL <hier Myriams Artifact-URL>.
-```
-
-## Falls Weg A nicht klappt (Netz B)
-
-`app-mobile/dist/dienstplaner-mobil.html` ist dieselbe App als normale
-Webseite (149 KB): auf GitHub/Cloudflare Pages legen, Link am Handy zum
-Startbildschirm hinzufügen. Alles funktioniert identisch — nur Mails kommen
-per Einfügen statt automatisch, und gesichert wird per Backup-Datei.
+---
 
 ## Paket für Myriam
 
-- `ANLEITUNG-MYRIAM.pdf` (4 Seiten)
-- ihren Artifact-Link aus Schritt 5
+- `ANLEITUNG-MYRIAM.pdf`
+- Sofort-Link: https://blashyrkh138.github.io/dienstplaner/
+- (später) ihr Artifact-Link aus Stufe 2

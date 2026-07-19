@@ -7,50 +7,45 @@ Google Drive — auf keinem fremden Server.
 
 ---
 
-## 1. Einmalige Einrichtung (ca. 10 Minuten)
+## 1. Sofort loslegen (funktioniert ohne alles)
 
-Die App läuft unter **deinem eigenen Claude-Konto**. Aaron richtet sie einmal
-zusammen mit dir ein — du musst dafür nichts installieren.
+**Öffne einfach diese Adresse im Browser:**
 
-### Schritt 1: Konnektoren verbinden (machst du selbst)
-1. Im Browser auf **claude.ai** anmelden (dein Claude-Pro-Konto).
-2. Unten links auf deinen Namen → **Einstellungen** → **Konnektoren**.
-3. **Gmail** verbinden → das Google-Konto wählen, in dem die
-   Verfügbarkeits-Mails der Mitarbeiter ankommen.
-4. **Google Drive** verbinden → dein Drive (dort speichert die App ihre Daten).
+### https://blashyrkh138.github.io/dienstplaner/
 
-Ohne diese zwei Verbindungen läuft die App zwar, aber der automatische
-Mail-Abruf und die Drive-Sicherung sind aus.
+Am Handy (Pixel) in Chrome öffnen → Menü (⋮) → **„Zum Startbildschirm
+hinzufügen"** → du hast ein App-Icon wie eine echte App. Am Laptop/Büro-PC
+einfach als Lesezeichen speichern.
 
-### Schritt 2: Deinen App-Link bekommen
-Aaron richtet die App einmalig unter deinem Konto ein (dafür meldest **du** dich
-kurz an seinem Rechner bei Claude an — er sieht dein Passwort nicht) und schickt
-dir danach deinen persönlichen App-Link.
+Damit kannst du **alles** tun: planen, Auto-Plan, Team & Kurse pflegen, Excel-
+und Kalender-Export. Verfügbarkeiten fügst du in dieser Stufe von Hand ein.
+Deine Daten liegen auf dem jeweiligen Gerät; für den Wechsel zwischen Geräten
+nutzt du im Tab **Export** die Knöpfe **Backup-Datei** (speichern) und
+**Backup laden**.
 
-Diesen Link öffnest du im Browser, **während du mit deinem Claude-Konto
-angemeldet bist**. Beim ersten Öffnen fragt Claude einmal, ob die App auf
-Gmail und Drive zugreifen darf → **Erlauben**. Fertig.
+## 2. Voll-Automatik freischalten (optional, ca. 10 Minuten)
 
-> Warum kein einfacher Link zum Weiterschicken? Apps mit Zugriff auf Mail und
-> Drive sind aus Sicherheitsgründen fest an ein Konto gebunden — genau das
-> schützt deine Daten.
+Wenn die App die Verfügbarkeits-Mails **selbst aus Gmail holen** und sich
+**automatisch über Google Drive zwischen allen Geräten abgleichen** soll,
+richten wir sie zusätzlich unter **deinem eigenen Claude-Konto** ein. Aaron
+hilft dir dabei; die genauen Schritte stehen in `UEBERGABE.md`. Kurz:
 
-### Schritt 3: Auf allen Geräten „installieren"
-Die App ist eine Webseite — dein App-Link funktioniert überall, wo du mit
-deinem Claude-Konto angemeldet bist:
-- **Handy (Pixel):** Link in Chrome öffnen → Menü (⋮) → **„Zum Startbildschirm
-  hinzufügen"** → die App bekommt ein Icon und öffnet wie eine echte App.
-- **Laptop zuhause / Büro-PC:** Link im Browser öffnen → als **Lesezeichen**
-  speichern (oder auch dort „Installieren"/„Verknüpfung erstellen" im Chrome-Menü).
+1. **Konnektoren verbinden:** claude.ai → dein Name → **Einstellungen →
+   Konnektoren** → **Gmail** und **Google Drive** verbinden.
+2. Aaron veröffentlicht die App unter deinem Konto (du meldest dich kurz an
+   seinem Rechner bei Claude an — er sieht dein Passwort nicht) und du bekommst
+   deinen persönlichen App-Link.
+3. Link öffnen (mit deinem Konto angemeldet) → beim ersten Zugriff auf Gmail/
+   Drive **Erlauben** → zum Startbildschirm hinzufügen.
 
-### Wie bleiben alle Geräte auf demselben Stand?
-Über dein **Google Drive** — vollautomatisch:
-- Beim **Öffnen** lädt die App immer den neuesten Stand aus deinem Drive.
-- Jede **Änderung** wird nach ein paar Sekunden automatisch als neue Datei
-  `dienstplaner-daten-…json` in dein Drive gespeichert. Die neueste gewinnt —
-  ältere bleiben als Sicherungskopien liegen, es geht nie etwas verloren.
-- Einzige Regel: **nicht auf zwei Geräten gleichzeitig planen.** Erst auf dem
-  einen fertig machen, dann auf dem anderen neu öffnen.
+Danach: Beim Öffnen lädt die App immer den neuesten Stand aus deinem Drive;
+jede Änderung wird automatisch dorthin gesichert (neueste gewinnt, ältere
+bleiben als Sicherung). Einzige Regel: **nicht auf zwei Geräten gleichzeitig
+planen** — erst fertig machen, dann am anderen Gerät neu öffnen.
+
+> Warum kein einfacher Link zum Weiterschicken für die Automatik? Apps mit
+> Zugriff auf Mail und Drive sind aus Sicherheitsgründen fest an ein Konto
+> gebunden — genau das schützt deine Daten.
 
 ---
 
